@@ -1,0 +1,26 @@
+# Local infrastructure for Doukyo.
+# Phase 0/1: just PostgreSQL. Redis and Kafka join later (design doc §5.3).
+#
+# Start it:   docker compose up -d
+# Stop it:    docker compose down
+# Wipe data:  docker compose down -v   (removes the volume — fresh DB)
+services:
+  postgres:
+    image: postgres:16
+    container_name: doukyo-postgres
+    environment:
+      POSTGRES_DB: doukyo
+      POSTGRES_USER: doukyo
+      POSTGRES_PASSWORD: doukyo   # local only — never a real secret
+    ports:
+      - "5432:5432"               # host:container — reachable at localhost:5432
+    volumes:
+      - doukyo_pgdata:/var/lib/postgresql/data
+    healthcheck:                  # lets other tools wait until Postgres is truly ready
+      test: ["CMD-SHELL", "pg_isready -U doukyo -d doukyo"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  doukyo_pgdata:                  # named volume => data survives `down`, dies on `down -v`

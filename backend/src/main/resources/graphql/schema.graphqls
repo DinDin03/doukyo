@@ -1,0 +1,13 @@
+# This is the GraphQL SCHEMA — the contract between client and server.
+# Spring for GraphQL auto-loads every *.graphqls file under resources/graphql/.
+#
+# GraphQL is schema-first and strongly typed: the client can only ask for fields
+# declared here, and the server must return exactly these shapes. The schema is the
+# single source of truth both sides code against (the mobile app will even generate
+# TypeScript types from it).
+
+type Query {
+    # The one field we support for now. `String!` — the `!` means non-null:
+    # a successful ping ALWAYS returns a string, never null.
+    ping: String!
+}
