@@ -23,19 +23,22 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 
 ---
 
-## Phase 0 — Project foundation ⬜
+## Phase 0 — Project foundation 🔨
 
 *Before any domain work. This is the "ceremony" ADR-001 accepts as the cost of learning the real stack.*
 
+**Sub-phases:** 0a = Spring Boot + GraphQL `ping`, no DB (✅ done). 0b = add Postgres + Flyway + JPA with the first real entities.
+
 ### Engineering / infra
-- ⬜ Gradle + Kotlin + Spring Boot project skeleton (single module to start).
-- ⬜ `docker-compose.yml` running PostgreSQL locally.
-- ⬜ Database migration tool wired in (Flyway or Liquibase) — schema is versioned from commit one.
-- ⬜ Spring profiles: `local` (Docker Postgres), `test` (Testcontainers or H2).
-- ⬜ Health-check endpoint (`GET /health`) and a smoke test that boots the context.
-- ⬜ `.gitignore` (exclude `.idea/`, `build/`, `*.log`, local env files).
-- ⬜ Package structure reflecting the modular monolith: `household`, `expense`, `chore`, `shopping`, `meal`, plus `common`.
-- ⬜ Baseline test setup: JUnit 5, MockMvc/WebTestClient, Testcontainers for a real Postgres in tests.
+- ✅ Gradle (Kotlin DSL) + Kotlin + Spring Boot project skeleton (`backend/`, single module).
+- ✅ `docker-compose.yml` running PostgreSQL 16 locally (created; run in Phase 0b).
+- ✅ **GraphQL API chosen** (Spring for GraphQL) with a working `ping` query + slice test.
+- ✅ `.gitignore` (excludes `.idea/`, `build/`, `node_modules/`, env files).
+- ⬜ Database migration tool wired in (Flyway) — schema versioned from commit one. *(0b)*
+- ⬜ Spring profiles: `local` (Docker Postgres), `test` (Testcontainers). *(0b)*
+- 🔨 Package structure reflecting the modular monolith: `household`, `expense`, `chore`, `shopping`, `meal`, `common` (only `health` exists so far).
+- 🔨 Baseline test setup: JUnit 5 ✅, `GraphQlTester` ✅, Testcontainers for real Postgres ⬜ *(0b)*.
+- ⬜ `mobile/` Expo + React Native + TypeScript app with Apollo Client calling `ping`.
 
 ### Concepts learned
 - The request/response loop made concrete (§8): controller → service → repository → DB.
@@ -43,8 +46,9 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 - Schema-as-code and repeatable environments (migrations + Docker Compose).
 - The test pyramid: unit (service logic) vs integration (real DB via Testcontainers).
 
-### Open decision (blocks a *mobile* client, not the backend)
-- ⬜ **Client choice** — the design doc says "mobile app" but specifies only a backend. Decide: REST-first backend with a thin client later (React Native / native / web). Recommendation: **build the API first**, add a client once expenses v1 is stable. Record the decision as ADR-005.
+### Decisions locked
+- ✅ **ADR-005 — Client stack: React Native + Expo (TypeScript).** One codebase for iOS + Android; Expo minimizes setup friction to preserve momentum; Apollo Client is best-in-class GraphQL tooling. Trade-off accepted: learning TypeScript alongside Kotlin.
+- ✅ **ADR-006 — GraphQL over REST (Spring for GraphQL).** One client-shaped endpoint fits the dashboard's multi-domain aggregation; high transfer value (Atlassian runs GraphQL heavily). Supersedes the "REST-first" hint. Trade-offs owned: HTTP-caching lost, N+1 needs DataLoader, query-depth limits needed — all treated as deliberate learning.
 
 ---
 

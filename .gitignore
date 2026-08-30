@@ -1,0 +1,30 @@
+# --- IDEs ---
+.idea/
+*.iml
+.vscode/
+
+# --- macOS ---
+.DS_Store
+
+# --- Backend (Gradle / Kotlin / JVM) ---
+backend/build/
+backend/.gradle/
+backend/out/
+*.log
+
+# --- Mobile (Expo / React Native / Node) ---
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example

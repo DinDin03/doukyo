@@ -1,0 +1,15 @@
+# Spring Boot configuration. YAML keys map onto Spring's config properties.
+spring:
+  application:
+    name: doukyo
+  graphql:
+    graphiql:
+      # GraphiQL: an in-browser IDE for writing queries against this server.
+      # Handy in development; we'll disable it in production later.
+      enabled: true          # available at http://localhost:8080/graphiql
+    schema:
+      printer:
+        enabled: true        # exposes the assembled schema for tooling/introspection
+
+server:
+  port: 8080                 # the mobile app will call http://<host>:8080/graphql
