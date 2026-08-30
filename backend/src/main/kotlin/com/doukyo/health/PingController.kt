@@ -1,4 +1,5 @@
 package com.doukyo.health
+import java.time.LocalTime
 
 import org.springframework.graphql.data.method.annotation.QueryMapping
 import org.springframework.stereotype.Controller
@@ -14,5 +15,8 @@ import org.springframework.stereotype.Controller
 class PingController {
 
     @QueryMapping
-    fun ping(): String = "pong"
+    fun ping(): String = "pong at ${LocalTime.now()}"
+
+    @QueryMapping
+    fun greeting(): String = "Welcome to the share house ${LocalTime.now()}"
 }

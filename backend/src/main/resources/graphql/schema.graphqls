@@ -10,4 +10,5 @@ type Query {
     # The one field we support for now. `String!` — the `!` means non-null:
     # a successful ping ALWAYS returns a string, never null.
     ping: String!
+    greeting: String!
 }
