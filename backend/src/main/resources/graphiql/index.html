@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Doukyo GraphiQL</title>
+    <style>
+        body { height: 100%; margin: 0; width: 100%; overflow: hidden; }
+        #graphiql { height: 100vh; }
+    </style>
+    <!--
+      Local override of Spring for GraphQL's bundled GraphiQL page.
+      Spring 1.3.3 ships UNVERSIONED unpkg URLs (e.g. unpkg.com/graphiql/graphiql.min.js).
+      unpkg serves the latest major, and GraphiQL's newer majors moved/renamed those
+      files, so the URLs now 404 -> "GraphiQL is not defined" -> stuck on "Loading...".
+      Fix: pin exact, known-good versions (all verified HTTP 200). The optional
+      explorer plugin is dropped because its unversioned URL was the 404 source.
+    -->
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/graphiql@3.8.3/graphiql.min.js" type="application/javascript"></script>
+    <link rel="stylesheet" href="https://unpkg.com/graphiql@3.8.3/graphiql.min.css" />
+</head>
+<body>
+<div id="graphiql">Loading...</div>
+<script>
+    // Identical wiring to Spring's page: honour ?path= / ?wsPath= query params.
+    const params = new URLSearchParams(window.location.search);
+    const path = params.get("path") || "/graphql";
+    const url = `${location.protocol}//${location.host}${path}`;
+    const wsPath = params.get("wsPath") || "/graphql";
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const subscriptionUrl = `${wsProtocol}//${location.host}${wsPath}`;
+
+    const gqlFetcher = GraphiQL.createFetcher({ url: url, subscriptionUrl: subscriptionUrl });
+
+    // Forward Spring Security's CSRF token if present (harmless if not).
+    const xsrfToken = document.cookie.match(new RegExp('(?:^| )XSRF-TOKEN=([^;]+)'));
+    const headers = xsrfToken ? `{ "X-XSRF-TOKEN" : "${ xsrfToken[1] }" }` : `{}`;
+
+    const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+    root.render(
+        React.createElement(GraphiQL, {
+            fetcher: gqlFetcher,
+            defaultVariableEditorOpen: true,
+            headerEditorEnabled: true,
+            shouldPersistHeaders: true,
+            headers: headers
+        })
+    );
+</script>
+</body>
+</html>
