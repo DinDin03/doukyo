@@ -10,13 +10,14 @@ const PING = gql`
   query Ping {
     ping
     greeting
+    hello
   }
 `;
 
 // A component whose entire job is to fetch and display `ping`.
 // useQuery runs the query and re-renders as its state changes.
 function PingStatus() {
-  const { data, loading, error } = useQuery<{ ping: string; greeting: string }>(PING);
+  const { data, loading, error } = useQuery<{ ping: string; greeting: string; hello: string }>(PING);
 
   if (loading) return <ActivityIndicator color="#38bdf8" style={{ marginTop: 28 }} />;
 
@@ -35,6 +36,7 @@ function PingStatus() {
       <View style={{ marginTop: 28, alignItems: 'center' }}>
         <Text style={styles.hint}>backend says: {data?.ping}</Text>
         <Text style={styles.hint}>greeting: {data?.greeting}</Text>
+          <Text style={styles.hint}>hello: {data?.hello}</Text>
       </View>
   );
 }
