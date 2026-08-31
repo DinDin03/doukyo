@@ -7,8 +7,27 @@
 # TypeScript types from it).
 
 type Query {
-    # The one field we support for now. `String!` — the `!` means non-null:
-    # a successful ping ALWAYS returns a string, never null.
+    # `String!` — the `!` means non-null: a successful ping ALWAYS returns a string.
     ping: String!
     greeting: String!
+    hello: String!
+
+    # --- Milestone 1a: Users ---
+    # Every user. `[User!]!` = a non-null list of non-null Users:
+    # the list itself is never null, and no element inside it is ever null.
+    users: [User!]!
+}
+
+# The Mutation root type holds operations that CHANGE data.
+# Convention: queries read, mutations write.
+type Mutation {
+    # Create a user; returns the created row (including its DB-assigned id).
+    createUser(name: String!, email: String!): User!
+}
+
+# A person. For now this mirrors the `users` table / User entity directly.
+type User {
+    id: ID!          # ID serializes as a String; maps from the Long primary key
+    name: String!
+    email: String!
 }
