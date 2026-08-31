@@ -2,14 +2,46 @@
 spring:
   application:
     name: doukyo
+
+  # --- Database connection (Phase 0b) ---
+  datasource:
+    # jdbc:postgresql://<host>:<port>/<db> — points at the Docker Postgres.
+    # Port 5433 (see docker-compose.yml) avoids a Homebrew Postgres on 5432.
+    url: jdbc:postgresql://localhost:5433/doukyo
+    username: doukyo
+    password: doukyo            # local only; never a real secret
+    hikari:
+      # HikariCP is Spring Boot's default connection pool. Small size for local dev.
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      # Flyway OWNS the schema. Hibernate only VALIDATES that our @Entity classes
+      # match the tables Flyway created — it never creates or alters tables.
+      # (Never use 'update'/'create' in a real app: non-deterministic and unsafe.)
+      ddl-auto: validate
+    # Print the SQL Hibernate generates, formatted — so you can SEE what the ORM
+    # does under the hood (and catch inefficiencies like the N+1 problem).
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    # Disable "Open Session In View": it keeps a DB session open for the whole HTTP
+    # request (even during rendering), which hides lazy-loading costs and holds
+    # connections too long. Off = you load data explicitly in the service layer.
+    open-in-view: false
+
+  # --- Schema migrations ---
+  flyway:
+    enabled: true
+    # Migrations are read from classpath:db/migration as V<n>__<name>.sql
+
   graphql:
     graphiql:
-      # GraphiQL: an in-browser IDE for writing queries against this server.
-      # Handy in development; we'll disable it in production later.
-      enabled: true          # available at http://localhost:8080/graphiql
+      enabled: true            # in-browser IDE at http://localhost:8080/graphiql
     schema:
       printer:
-        enabled: true        # exposes the assembled schema for tooling/introspection
+        enabled: true
 
 server:
-  port: 8080                 # the mobile app will call http://<host>:8080/graphql
+  port: 8080
