@@ -13,7 +13,10 @@ services:
       POSTGRES_USER: doukyo
       POSTGRES_PASSWORD: doukyo   # local only — never a real secret
     ports:
-      - "5432:5432"               # host:container — reachable at localhost:5432
+      # host:container. Host port 5433 (not 5432) to avoid colliding with a
+      # Homebrew postgresql already listening on the Mac's 5432. Inside the
+      # container Postgres still uses 5432; we just publish it on 5433.
+      - "5433:5432"               # reachable from the Mac at localhost:5433
     volumes:
       - doukyo_pgdata:/var/lib/postgresql/data
     healthcheck:                  # lets other tools wait until Postgres is truly ready

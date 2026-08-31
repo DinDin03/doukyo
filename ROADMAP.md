@@ -34,11 +34,11 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 - ✅ `docker-compose.yml` running PostgreSQL 16 locally (created; run in Phase 0b).
 - ✅ **GraphQL API chosen** (Spring for GraphQL) with a working `ping` query + slice test.
 - ✅ `.gitignore` (excludes `.idea/`, `build/`, `node_modules/`, env files).
-- ⬜ Database migration tool wired in (Flyway) — schema versioned from commit one. *(0b)*
+- ✅ Database wired: Postgres 16 (Docker, host port **5433** to avoid a Homebrew Postgres on 5432) + Spring Data JPA (`ddl-auto: validate`) + **Flyway**; `V1__init.sql` creates `users`/`households`/`memberships`.
 - ⬜ Spring profiles: `local` (Docker Postgres), `test` (Testcontainers). *(0b)*
 - 🔨 Package structure reflecting the modular monolith: `household`, `expense`, `chore`, `shopping`, `meal`, `common` (only `health` exists so far).
 - 🔨 Baseline test setup: JUnit 5 ✅, `GraphQlTester` ✅, Testcontainers for real Postgres ⬜ *(0b)*.
-- ⬜ `mobile/` Expo + React Native + TypeScript app with Apollo Client calling `ping`.
+- ✅ `mobile/` Expo (SDK 54) + React Native + TypeScript app with Apollo Client calling `ping`/`greeting` live.
 
 ### Concepts learned
 - The request/response loop made concrete (§8): controller → service → repository → DB.

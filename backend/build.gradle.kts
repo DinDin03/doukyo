@@ -44,6 +44,16 @@ dependencies {
     // Kotlin reflection — Spring and Jackson need it at runtime.
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
+    // --- Database (Phase 0b) ---
+    // Spring Data JPA: Hibernate ORM + the repository abstraction (save/findById/...).
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // The PostgreSQL JDBC driver — needed only at runtime, not to compile against.
+    runtimeOnly("org.postgresql:postgresql")
+    // Flyway: versioned SQL schema migrations. Since Flyway 10, PostgreSQL support
+    // lives in a separate module that must be declared explicitly.
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+
     // --- Testing ---
     // JUnit 5, MockMvc, AssertJ, Mockito — the standard Spring test stack.
     testImplementation("org.springframework.boot:spring-boot-starter-test")
