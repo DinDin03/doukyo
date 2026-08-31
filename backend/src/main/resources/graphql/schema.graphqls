@@ -16,6 +16,10 @@ type Query {
     # Every user. `[User!]!` = a non-null list of non-null Users:
     # the list itself is never null, and no element inside it is ever null.
     users: [User!]!
+
+    # --- Households ---
+    households: [Household!]!          # all households
+    household(id: ID!): Household      # one by id, or null if not found
 }
 
 # The Mutation root type holds operations that CHANGE data.
@@ -23,6 +27,10 @@ type Query {
 type Mutation {
     # Create a user; returns the created row (including its DB-assigned id).
     createUser(name: String!, email: String!): User!
+
+    createHousehold(name: String!): Household!
+    # Add an existing user to a household; returns the updated household.
+    addMember(householdId: ID!, userId: ID!): Household!
 }
 
 # A person. For now this mirrors the `users` table / User entity directly.
@@ -30,4 +38,12 @@ type User {
     id: ID!          # ID serializes as a String; maps from the Long primary key
     name: String!
     email: String!
+}
+
+# A shared house. `members` is resolved on demand from the memberships join table.
+type Household {
+    id: ID!
+    name: String!
+    createdAt: String!        # timestamp, serialized as an ISO-8601 string
+    members: [User!]!         # the users in this household (via memberships)
 }
