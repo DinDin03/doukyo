@@ -5,6 +5,9 @@ plugins {
     // CGLIB subclassing for @Configuration, @Transactional, etc.). Kotlin classes
     // are `final` by default, so without this Spring can't create proxies.
     kotlin("plugin.spring") version "1.9.25"
+    // Generates the no-arg constructor JPA/Hibernate needs to instantiate @Entity
+    // classes via reflection (Kotlin classes with ctor params lack one otherwise).
+    kotlin("plugin.jpa") version "1.9.25"
     // Brings in the Spring Boot Gradle tasks (bootRun, bootJar) and BOM alignment.
     id("org.springframework.boot") version "3.3.5"
     // Lets us declare Spring dependencies without version numbers — the BOM picks

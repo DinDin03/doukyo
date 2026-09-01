@@ -19,4 +19,7 @@ class PingController {
 
     @QueryMapping
     fun greeting(): String = "Welcome to the share house ${LocalTime.now()}"
+
+    @QueryMapping
+    fun hello(): String = "Hello World"
 }
