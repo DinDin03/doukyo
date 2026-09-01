@@ -57,6 +57,16 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // --- Security & auth ---
+    // Spring Security: the servlet filter chain, authentication plumbing, and
+    // BCryptPasswordEncoder for hashing passwords.
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    // JWT: create and verify signed tokens. Code against -api; the -impl and
+    // -jackson artifacts are pulled in only at runtime.
+    implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
     // --- Testing ---
     // JUnit 5, MockMvc, AssertJ, Mockito — the standard Spring test stack.
     testImplementation("org.springframework.boot:spring-boot-starter-test")
