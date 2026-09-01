@@ -1,4 +1,4 @@
--- V2: expenses & splitting (design doc §6.2).
+-- V3: expenses & splitting (design doc §6.2).
 -- One expense, MANY shares (one-to-many). Shares always sum to the expense amount
 -- — an aggregate invariant enforced in the application within one transaction,
 -- because Postgres CHECK constraints see a single row and can't express a
