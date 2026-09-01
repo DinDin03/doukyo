@@ -226,6 +226,7 @@ export function Field({
   placeholder,
   autoCapitalize,
   keyboardType,
+  secureTextEntry,
   style,
   inputStyle,
 }: {
@@ -235,6 +236,7 @@ export function Field({
   placeholder?: string;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   keyboardType?: 'default' | 'email-address' | 'numeric';
+  secureTextEntry?: boolean;
   style?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
 }) {
@@ -248,6 +250,7 @@ export function Field({
         placeholderTextColor={ink(0.35)}
         autoCapitalize={autoCapitalize}
         keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
         style={[styles.input, inputStyle]}
       />
     </View>

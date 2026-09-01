@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/auth/AuthContext';
 import { AppHeader } from '../../src/design/AppHeader';
 import { Body, Divider, Heading, Kicker, Num, Row, Screen } from '../../src/design/ui';
 import { Avatar } from '../../src/design/widgets';
@@ -13,10 +13,10 @@ const MEMBERS = [
   { initial: 'R', name: 'Ravi', note: 'Joined September', balance: '+$24', owed: true },
 ];
 
-const LINKS = ['Notifications', 'Receipts & exports', 'Help & feedback', 'Leave this household'];
+const LINKS = ['Notifications', 'Receipts & exports', 'Help & feedback', 'Sign out'];
 
 export default function MoreScreen() {
-  const router = useRouter();
+  const { signOut } = useAuth();
   return (
     <View style={styles.root}>
       <AppHeader kicker="同居 · Flat 7" title="More" />
@@ -70,10 +70,10 @@ export default function MoreScreen() {
           {LINKS.map((l) => (
             <Row
               key={l}
-              onPress={() => (l === 'Leave this household' ? router.replace('/welcome') : undefined)}
+              onPress={() => (l === 'Sign out' ? signOut() : undefined)}
               style={styles.linkRow}
             >
-              <Body size={14} color={l === 'Leave this household' ? colors.accentRamp[700] : colors.text}>
+              <Body size={14} color={l === 'Sign out' ? colors.accentRamp[700] : colors.text}>
                 {l}
               </Body>
               <Feather name="chevron-right" size={15} color={ink(0.35)} />
