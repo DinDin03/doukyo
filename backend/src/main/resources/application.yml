@@ -45,3 +45,12 @@ spring:
 
 server:
   port: 8080
+
+# --- Auth / JWT (Slice 1) ---
+doukyo:
+  security:
+    # HS256 signing key, Base64-encoded (>= 32 bytes when decoded). DEV ONLY —
+    # in production this MUST come from an env var / secret manager, never git.
+    jwt-secret: ZG91a3lvLWRldi1qd3Qtc2VjcmV0LWNoYW5nZS1pbi1wcm9kdWN0aW9uLXBsZWFzZS0xMjM0NTY3OA==
+    access-ttl-minutes: 15   # short-lived access token
+    refresh-ttl-days: 30     # long-lived refresh token

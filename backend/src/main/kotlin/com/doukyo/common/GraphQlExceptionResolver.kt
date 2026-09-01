@@ -24,6 +24,13 @@ class GraphQlExceptionResolver : DataFetcherExceptionResolverAdapter() {
                     .message(ex.message)
                     .build()
 
+            // Missing/expired auth -> UNAUTHORIZED with a safe message.
+            is UnauthorizedException ->
+                GraphqlErrorBuilder.newError(env)
+                    .errorType(ErrorType.UNAUTHORIZED)
+                    .message(ex.message)
+                    .build()
+
             // Not one we recognise -> return null so Spring masks it (INTERNAL_ERROR).
             else -> null
         }
