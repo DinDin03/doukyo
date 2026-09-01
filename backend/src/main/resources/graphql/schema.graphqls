@@ -20,6 +20,9 @@ type Query {
     # --- Households ---
     households: [Household!]!          # all households
     household(id: ID!): Household      # one by id, or null if not found
+
+    # --- Auth ---
+    me: User!                          # the currently signed-in user (errors if not)
 }
 
 # The Mutation root type holds operations that CHANGE data.
@@ -31,6 +34,11 @@ type Mutation {
     createHousehold(name: String!): Household!
     # Add an existing user to a household; returns the updated household.
     addMember(householdId: ID!, userId: ID!): Household!
+
+    # --- Auth ---
+    signUp(name: String!, email: String!, password: String!): AuthPayload!
+    signIn(email: String!, password: String!): AuthPayload!
+    refresh(refreshToken: String!): AuthPayload!
 }
 
 # A person. For now this mirrors the `users` table / User entity directly.
@@ -46,4 +54,11 @@ type Household {
     name: String!
     createdAt: String!        # timestamp, serialized as an ISO-8601 string
     members: [User!]!         # the users in this household (via memberships)
+}
+
+# Returned by every auth mutation: the tokens plus the signed-in user.
+type AuthPayload {
+    accessToken: String!      # short-lived JWT — send as `Authorization: Bearer <token>`
+    refreshToken: String!     # long-lived; exchange for a new access token via refresh()
+    user: User!
 }
