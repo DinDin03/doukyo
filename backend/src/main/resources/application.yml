@@ -42,6 +42,10 @@ spring:
     schema:
       printer:
         enabled: true
+    websocket:
+      # Its own path: the HTTP endpoint at /graphql only accepts POST, so it
+      # answers the WebSocket upgrade (a GET) with 405.
+      path: /graphql-ws
 
 server:
   port: 8080
@@ -54,3 +58,7 @@ doukyo:
     jwt-secret: ZG91a3lvLWRldi1qd3Qtc2VjcmV0LWNoYW5nZS1pbi1wcm9kdWN0aW9uLXBsZWFzZS0xMjM0NTY3OA==
     access-ttl-minutes: 15   # short-lived access token
     refresh-ttl-days: 30     # long-lived refresh token
+    # The Google OAuth "Web application" client ID — the AUDIENCE every Google ID
+    # token must be minted for to be accepted. Public value (ships in the app),
+    # not a secret; safe in source control.
+    google-client-id: 1029240944963-t6fhppcjrqco70mqmo19ds9d4rhkh8qi.apps.googleusercontent.com

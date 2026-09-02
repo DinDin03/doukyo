@@ -1,52 +1,68 @@
 package com.doukyo.household
 
+import com.doukyo.common.UnauthorizedException
 import com.doukyo.user.User
 import com.doukyo.user.UserRepository
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-// Business logic for households and memberships. It depends on UserRepository too
-// (a household operation needs to look up users) — a normal cross-module dependency
-// inside the modular monolith.
 @Service
 class HouseholdService(
     private val householdRepository: HouseholdRepository,
     private val membershipRepository: MembershipRepository,
     private val userRepository: UserRepository,
 ) {
+    // Excludes 0/O/1/I/L — characters people misread when a code is read aloud
+    // or typed from a photo of a screen.
+    private val codeChars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
     @Transactional(readOnly = true)
-    fun findAll(): List<Household> = householdRepository.findAll()
+    fun findMyHouseholds(userId: Long): List<Household> =
+        membershipRepository.findHouseholdsForUser(userId).map { it.household }
 
+    // Returns null for "doesn't exist" AND "you're not a member" alike — we never
+    // reveal that a household exists to someone who isn't in it.
     @Transactional(readOnly = true)
-    fun findById(id: Long): Household? = householdRepository.findByIdOrNull(id)
+    fun findByIdForMember(id: Long, userId: Long): Household? {
+        val household = householdRepository.findByIdOrNull(id) ?: return null
+        return household.takeIf { membershipRepository.existsByUserIdAndHouseholdId(userId, id) }
+    }
 
     @Transactional
-    fun createHousehold(name: String): Household =
-        householdRepository.save(Household(name = name))
-
-    @Transactional
-    fun addMember(householdId: Long, userId: Long): Household {
-        // Validate both ends exist — friendly BAD_REQUEST instead of an FK crash.
-        val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw IllegalArgumentException("No household with id $householdId")
-        val user = userRepository.findByIdOrNull(userId)
-            ?: throw IllegalArgumentException("No user with id $userId")
-
-        // Business rule: can't join the same household twice. The UNIQUE
-        // (user_id, household_id) constraint is the hard backstop.
-        require(!membershipRepository.existsByUserIdAndHouseholdId(userId, householdId)) {
-            "User $userId is already a member of household $householdId"
-        }
-
+    fun createHousehold(name: String, userId: Long): Household {
+        val cleanName = name.trim()
+        require(cleanName.isNotBlank()) { "Please give your household a name" }
+        require(cleanName.length <= 60) { "That name is too long" }
+        val user = requireUser(userId)
+        val household = householdRepository.save(Household(name = cleanName, inviteCode = generateUniqueInviteCode()))
         membershipRepository.save(Membership(user = user, household = household))
         return household
     }
 
-    // Runs inside a read-only transaction; the JOIN FETCH query means each
-    // membership's user is already loaded, so mapping to it is safe and cheap.
+    @Transactional
+    fun joinHousehold(code: String, userId: Long): Household {
+        val user = requireUser(userId)
+        val household = householdRepository.findByInviteCode(code.trim().uppercase())
+            ?: throw IllegalArgumentException("That invite code doesn't match a household")
+        require(!membershipRepository.existsByUserIdAndHouseholdId(userId, household.id!!)) {
+            "You're already a member of ${household.name}"
+        }
+        membershipRepository.save(Membership(user = user, household = household))
+        return household
+    }
+
     @Transactional(readOnly = true)
     fun findMembers(householdId: Long): List<User> =
         membershipRepository.findMembersOfHousehold(householdId).map { it.user }
+
+    private fun requireUser(userId: Long): User =
+        userRepository.findByIdOrNull(userId) ?: throw UnauthorizedException("This account no longer exists")
+
+    private fun generateUniqueInviteCode(): String {
+        while (true) {
+            val code = (1..6).map { codeChars.random() }.joinToString("")
+            if (!householdRepository.existsByInviteCode(code)) return code
+        }
+    }
 }

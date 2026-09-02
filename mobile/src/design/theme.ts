@@ -9,6 +9,7 @@ export const colors = {
   appBg: '#e6e4e0', // ground behind the device in the prototype
   text: '#201f1d', // --color-text
   accent: '#b68235', // --color-accent (brass gold)
+  transition: '#D97757', // the bubble transition's fill
   divider: 'rgba(32,31,29,0.16)', // --color-divider (ink 16%)
 
   // Neutral tonal ramp (100 light → 900 dark)

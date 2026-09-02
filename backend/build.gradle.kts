@@ -37,6 +37,9 @@ dependencies {
     // Spring for GraphQL: the single /graphql endpoint, schema wiring, @QueryMapping,
     // and (in dev) the GraphiQL in-browser query IDE. Built on graphql-java.
     implementation("org.springframework.boot:spring-boot-starter-graphql")
+    // Required for GraphQL subscriptions: without it Spring registers only the HTTP
+    // /graphql endpoint and the WebSocket path 404s.
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
     // Bean Validation (@NotNull, @Positive, ...) — we'll lean on this for input rules.
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
@@ -66,6 +69,9 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+    // Google API client — GoogleIdTokenVerifier verifies a Google ID token's
+    // signature, issuer, and audience against Google's public keys.
+    implementation("com.google.api-client:google-api-client:2.7.0")
 
     // --- Testing ---
     // JUnit 5, MockMvc, AssertJ, Mockito — the standard Spring test stack.

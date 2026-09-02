@@ -12,6 +12,11 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
     @Query("select m from Membership m join fetch m.user where m.household.id = :householdId")
     fun findMembersOfHousehold(@Param("householdId") householdId: Long): List<Membership>
 
+    // The reverse direction: every household a user belongs to. JOIN FETCH m.household
+    // for the same reason as above — one query instead of N.
+    @Query("select m from Membership m join fetch m.household where m.user.id = :userId")
+    fun findHouseholdsForUser(@Param("userId") userId: Long): List<Membership>
+
     // Derived query traversing the associations: m.user.id AND m.household.id.
     // Used to stop a user being added to the same household twice.
     fun existsByUserIdAndHouseholdId(userId: Long, householdId: Long): Boolean

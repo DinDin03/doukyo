@@ -18,6 +18,10 @@ class Household(
     @Column(nullable = false)
     var name: String,
 
+    // Generated once at creation (HouseholdService), never changes.
+    @Column(name = "invite_code", nullable = false, unique = true)
+    val inviteCode: String,
+
     // OffsetDateTime maps to the `timestamptz` column. We set it in code; the DB's
     // DEFAULT now() is the backstop if it's ever omitted.
     @Column(name = "created_at", nullable = false)

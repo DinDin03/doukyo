@@ -6,6 +6,7 @@ import { AppHeader } from '../../src/design/AppHeader';
 import { Body, Button, Kicker, Num, Row, Screen } from '../../src/design/ui';
 import { Avatar, Segmented } from '../../src/design/widgets';
 import { colors, ink } from '../../src/design/theme';
+import { useHousehold } from '../../src/household/HouseholdContext';
 
 const GROUPS = [
   {
@@ -26,11 +27,12 @@ const GROUPS = [
 
 export default function ExpensesScreen() {
   const router = useRouter();
+  const { activeHousehold } = useHousehold();
   const [tab, setTab] = useState<'all' | 'balances'>('all');
 
   return (
     <View style={styles.root}>
-      <AppHeader kicker="同居 · Flat 7" title="Expenses" onBell={() => router.push('/activity')} />
+      <AppHeader kicker={`同居 · ${activeHousehold?.name ?? ''}`} title="Expenses" onBell={() => router.push('/activity')} />
       <Screen>
         <Segmented
           options={[

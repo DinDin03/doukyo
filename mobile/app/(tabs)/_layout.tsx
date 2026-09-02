@@ -1,17 +1,23 @@
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { colors, fonts, ink } from '../../src/design/theme';
+import { useHousehold } from '../../src/household/HouseholdContext';
+import { useUnreadCount } from '../../src/chat/useUnreadCount';
 
 // The bottom tab bar, styled to the Classical system: quiet ground, a hairline
 // top rule, the brass accent for the active tab, Lora labels. Headers are hidden
 // here because each screen draws its own editorial header.
 export default function TabsLayout() {
+  const { activeHousehold } = useHousehold();
+  const { count: unread } = useUnreadCount(activeHousehold?.id);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: ink(0.42),
+        tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 10 },
         tabBarStyle: {
           backgroundColor: colors.bg,
           borderTopColor: colors.divider,
@@ -26,6 +32,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{ title: 'Home', tabBarIcon: ({ color }) => <Feather name="home" color={color} size={19} /> }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color }) => <Feather name="message-circle" color={color} size={19} />,
+          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
+        }}
       />
       <Tabs.Screen
         name="expenses"

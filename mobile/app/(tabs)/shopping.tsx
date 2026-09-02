@@ -6,6 +6,7 @@ import { AppHeader } from '../../src/design/AppHeader';
 import { Body, Button, Heading, Kicker, Screen } from '../../src/design/ui';
 import { Checkbox } from '../../src/design/widgets';
 import { colors, ink, radius } from '../../src/design/theme';
+import { useHousehold } from '../../src/household/HouseholdContext';
 
 type Item = { id: string; name: string; by: string; done: boolean; aisle: string };
 const INITIAL: Item[] = [
@@ -20,6 +21,7 @@ const AISLES = ['Produce', 'Dairy', 'Pantry', 'Added'];
 
 export default function ShoppingScreen() {
   const router = useRouter();
+  const { activeHousehold } = useHousehold();
   const [items, setItems] = useState(INITIAL);
   const [draft, setDraft] = useState('');
 
@@ -32,7 +34,7 @@ export default function ShoppingScreen() {
 
   return (
     <View style={styles.root}>
-      <AppHeader kicker="同居 · Flat 7" title="Shopping" onBell={() => router.push('/activity')} />
+      <AppHeader kicker={`同居 · ${activeHousehold?.name ?? ''}`} title="Shopping" onBell={() => router.push('/activity')} />
       <Screen>
         <View style={styles.addBar}>
           <TextInput
