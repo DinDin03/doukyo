@@ -5,6 +5,7 @@ import { AppHeader } from '../../src/design/AppHeader';
 import { Body, Button, Kicker, Num, Screen } from '../../src/design/ui';
 import { Checkbox, Segmented, Tag } from '../../src/design/widgets';
 import { colors, ink, radius } from '../../src/design/theme';
+import { useHousehold } from '../../src/household/HouseholdContext';
 
 const GROUPS = [
   {
@@ -32,12 +33,13 @@ const FAIRNESS = [
 
 export default function ChoresScreen() {
   const router = useRouter();
+  const { activeHousehold } = useHousehold();
   const [tab, setTab] = useState<'roster' | 'fairness'>('roster');
   const [done, setDone] = useState<Record<string, boolean>>({});
 
   return (
     <View style={styles.root}>
-      <AppHeader kicker="同居 · Flat 7" title="Chores" onBell={() => router.push('/activity')} />
+      <AppHeader kicker={`同居 · ${activeHousehold?.name ?? ''}`} title="Chores" onBell={() => router.push('/activity')} />
       <Screen>
         <Segmented
           options={[

@@ -1,11 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Body, Button, Heading } from '../src/design/ui';
-import { colors, ink } from '../src/design/theme';
+import { Body, Button, Heading } from '../../src/design/ui';
+import { colors, ink } from '../../src/design/theme';
 
-// The onboarding welcome. Buttons drop into the app (no real auth yet).
-export default function Welcome() {
+export default function HouseholdChoice() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
@@ -19,12 +18,12 @@ export default function Welcome() {
         </Heading>
         <View style={styles.rule} />
         <Body size={14.5} color={ink(0.66)} style={styles.tagline}>
-          Living together, kept fair. One calm place for the money, the roster, the list and the week&apos;s meals.
+          One more step — create your household, or join one with a code.
         </Body>
       </View>
       <View style={{ gap: 10 }}>
-        <Button label="Create a household" block onPress={() => router.replace('/')} />
-        <Button label="Join with a code" variant="secondary" block onPress={() => router.push('/join')} />
+        <Button label="Create a household" block onPress={() => router.push('/(household)/create')} />
+        <Button label="Join with a code" variant="secondary" block onPress={() => router.push('/(household)/join')} />
         <Body size={11} color={ink(0.45)} style={styles.foot}>
           No accounts, no admin. Everyone in the house is equal.
         </Body>

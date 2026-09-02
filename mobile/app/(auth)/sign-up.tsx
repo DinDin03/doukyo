@@ -15,7 +15,7 @@ function authError(e: unknown): string {
 export default function SignUp() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, googleSignIn } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +27,18 @@ export default function SignUp() {
     setError(null);
     try {
       await signUp(name.trim(), email.trim(), password);
+    } catch (e) {
+      setError(authError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitGoogle = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await googleSignIn();
     } catch (e) {
       setError(authError(e));
     } finally {
@@ -60,6 +72,7 @@ export default function SignUp() {
       ) : null}
 
       <Button label={busy ? 'Creating…' : 'Create account'} block onPress={submit} style={{ marginTop: 22 }} />
+      <Button label="Continue with Google" variant="secondary" block onPress={submitGoogle} style={{ marginTop: 10 }} />
 
       <View style={styles.foot}>
         <Body size={13} color={ink(0.55)}>

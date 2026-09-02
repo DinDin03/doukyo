@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { AppHeader } from '../../src/design/AppHeader';
 import { Body, Heading, Kicker, Num, Row, Screen } from '../../src/design/ui';
 import { colors, ink } from '../../src/design/theme';
+import { useHousehold } from '../../src/household/HouseholdContext';
 
 const WEEK = [
   { day: 'MON', date: '28', meal: 'Miso salmon', cook: 'Ravi cooks', today: false },
@@ -24,9 +25,10 @@ const COOKBOOK = [
 
 export default function MealsScreen() {
   const router = useRouter();
+  const { activeHousehold } = useHousehold();
   return (
     <View style={styles.root}>
-      <AppHeader kicker="同居 · Flat 7" title="Meals" onBell={() => router.push('/activity')} />
+      <AppHeader kicker={`同居 · ${activeHousehold?.name ?? ''}`} title="Meals" onBell={() => router.push('/activity')} />
       <Screen>
         <View style={styles.weekHead}>
           <Kicker color={ink(0.45)}>This week</Kicker>

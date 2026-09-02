@@ -189,6 +189,7 @@ export function Button({
   variant = 'primary',
   block,
   left,
+  disabled,
   style,
 }: {
   label: string;
@@ -196,6 +197,7 @@ export function Button({
   variant?: 'primary' | 'secondary';
   block?: boolean;
   left?: ReactNode;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const borderColor = variant === 'primary' ? colors.accent : colors.divider;
@@ -203,9 +205,11 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.btn,
         { borderColor },
+        disabled && { opacity: 0.45 },
         block && styles.btnBlock,
         pressed && { backgroundColor: variant === 'primary' ? 'rgba(182,130,53,0.12)' : 'rgba(32,31,29,0.06)' },
         style,

@@ -21,7 +21,11 @@ class GraphQlExceptionResolver : DataFetcherExceptionResolverAdapter() {
             is IllegalArgumentException ->
                 GraphqlErrorBuilder.newError(env)
                     .errorType(ErrorType.BAD_REQUEST)
-                    .message(ex.message)
+                    // Defensive: an exception's .message CAN be null (either thrown
+                    // with no message, or from third-party code we don't control).
+                    // Never pass null into the error builder — fall back to a safe
+                    // generic message instead.
+                    .message(ex.message ?: "That request wasn't valid")
                     .build()
 
             // Missing/expired auth -> UNAUTHORIZED with a safe message.

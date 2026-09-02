@@ -2,5 +2,9 @@ package com.doukyo.household
 
 import org.springframework.data.jpa.repository.JpaRepository
 
-// Plain CRUD for households — save/findById/findAll/... all free.
-interface HouseholdRepository : JpaRepository<Household, Long>
+interface HouseholdRepository : JpaRepository<Household, Long> {
+
+    fun existsByInviteCode(code: String): Boolean
+
+    fun findByInviteCode(code: String): Household?
+}

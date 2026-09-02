@@ -16,8 +16,10 @@ import java.util.Base64
 class AuthService(
     private val userRepository: UserRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
+    private val oAuthAccountRepository: OAuthAccountRepository,
     private val jwtService: JwtService,
     private val passwordEncoder: PasswordEncoder,
+    private val googleTokenVerifier: GoogleTokenVerifier,
     @Value("\${doukyo.security.refresh-ttl-days}") private val refreshTtlDays: Long,
 ) {
     private val secureRandom = SecureRandom()
@@ -57,6 +59,58 @@ class AuthService(
         // ROTATION: spend this refresh token so it can't be reused, then mint a fresh pair.
         stored.revokedAt = OffsetDateTime.now()
         return issueTokens(stored.user)
+    }
+
+    // Revokes a refresh token server-side, so a copy that leaked before sign-out
+    // can't be used to get a new access token. Always succeeds — an unknown or
+    // already-revoked token is not an error, just a no-op.
+    @Transactional
+    fun signOut(rawRefreshToken: String) {
+        refreshTokenRepository.findByTokenHash(sha256(rawRefreshToken))
+            ?.takeIf { it.revokedAt == null }
+            ?.let { it.revokedAt = OffsetDateTime.now() }
+    }
+
+    @Transactional
+    fun googleSignIn(idToken: String): AuthPayload {
+        // The ONE place we decide to trust the caller's claim of identity. Everything
+        // below treats `identity` as ground truth.
+        val identity = googleTokenVerifier.verify(idToken)
+
+        // Case 1: this Google account has signed in before — same user, every time.
+        // (provider, providerUserId) is unique, so at most one row can match.
+        oAuthAccountRepository.findByProviderAndProviderUserId(OAuthProvider.GOOGLE, identity.subject)?.let {
+            return issueTokens(it.user)
+        }
+
+        val cleanEmail = identity.email.trim().lowercase()
+        val existingByEmail = userRepository.findByEmail(cleanEmail)
+
+        val user = if (existingByEmail != null) {
+            // Case 2: an account with this email already exists (likely password-based).
+            // LINK to it — but ONLY because Google itself asserts the email is verified.
+            // Linking on an unverified email would let an attacker take over any
+            // account just by typing its address into a Google account they control.
+            require(identity.emailVerified) {
+                "This Google account's email isn't verified — sign in with your password instead"
+            }
+            // The email is now proven; upgrade the local flag if it wasn't already.
+            if (!existingByEmail.emailVerified) existingByEmail.emailVerified = true
+            userRepository.save(existingByEmail)
+        } else {
+            // Case 3: brand-new user, Google-only. No password — passwordHash stays
+            // null, exactly the case that column was made nullable for.
+            userRepository.save(
+                User(name = identity.name, email = cleanEmail, emailVerified = identity.emailVerified),
+            )
+        }
+
+        // Remember this Google identity so case 1 fires on every future sign-in.
+        oAuthAccountRepository.save(
+            OAuthAccount(user = user, provider = OAuthProvider.GOOGLE, providerUserId = identity.subject),
+        )
+
+        return issueTokens(user)
     }
 
     // Mint an access JWT + a new refresh token; persist only the refresh token's hash.

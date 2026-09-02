@@ -14,7 +14,7 @@ function authError(e: unknown): string {
 export default function SignIn() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, googleSignIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,6 +26,18 @@ export default function SignIn() {
     try {
       await signIn(email.trim(), password);
       // The auth gate (root layout) redirects into the app once `user` is set.
+    } catch (e) {
+      setError(authError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitGoogle = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await googleSignIn(); // 'cancelled' just means the user backed out — no error
     } catch (e) {
       setError(authError(e));
     } finally {
@@ -57,7 +69,7 @@ export default function SignIn() {
       ) : null}
 
       <Button label={busy ? 'Signing in…' : 'Sign in'} block onPress={submit} style={{ marginTop: 22 }} />
-      <Button label="Continue with Google" variant="secondary" block onPress={() => setError('Google sign-in is coming soon')} style={{ marginTop: 10 }} />
+      <Button label="Continue with Google" variant="secondary" block onPress={submitGoogle} style={{ marginTop: 10 }} />
 
       <View style={styles.foot}>
         <Body size={13} color={ink(0.55)}>

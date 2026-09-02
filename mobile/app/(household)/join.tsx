@@ -1,16 +1,37 @@
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Body, Button, Divider, Heading } from '../src/design/ui';
-import { colors, ink, radius } from '../src/design/theme';
+import { Body, Button, Divider, Heading } from '../../src/design/ui';
+import { colors, ink, radius } from '../../src/design/theme';
+import { useHousehold } from '../../src/household/HouseholdContext';
 
-export default function Join() {
+function errorMessage(e: unknown): string {
+  const err = e as { errors?: { message: string }[]; graphQLErrors?: { message: string }[]; message?: string };
+  return err?.errors?.[0]?.message ?? err?.graphQLErrors?.[0]?.message ?? err?.message ?? 'Something went wrong';
+}
+
+export default function JoinHousehold() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { joinHousehold } = useHousehold();
   const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await joinHousehold(code.trim());
+      // The root gate redirects into the app once `households` is non-empty.
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 30 }]}>
@@ -38,7 +59,20 @@ export default function Join() {
         maxLength={6}
         style={styles.codeInput}
       />
-      <Button label="Join" block onPress={() => router.replace('/')} style={{ marginTop: 20 }} />
+
+      {error ? (
+        <Body size={13} color={colors.accentRamp[700]} style={{ marginTop: 14 }}>
+          {error}
+        </Body>
+      ) : null}
+
+      <Button
+        label={busy ? 'Joining…' : 'Join'}
+        block
+        disabled={busy || code.trim().length < 6}
+        onPress={submit}
+        style={{ marginTop: 20 }}
+      />
 
       <Body size={11.5} color={ink(0.45)} style={styles.foot}>
         Joining adds you to the members list. Nothing is shared outside the house.

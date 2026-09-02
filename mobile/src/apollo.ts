@@ -1,12 +1,18 @@
-import { ApolloClient, CombinedGraphQLErrors, HttpLink, InMemoryCache, from } from '@apollo/client';
+import { ApolloClient, CombinedGraphQLErrors, HttpLink, InMemoryCache, from, split } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { getMainDefinition } from '@apollo/client/utilities';
+import { createClient } from 'graphql-ws';
 import Constants from 'expo-constants';
 import { clearTokens, getAccessToken, getRefreshToken, isAccessStale, saveTokens } from './auth/tokens';
 
 // The backend URL — derived from Metro's host so it follows your Mac's LAN IP.
 const metroHost = Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost';
 export const API_URL = `http://${metroHost}:8080/graphql`;
+// Subscriptions have their own path: /graphql only accepts POST, so it rejects the
+// WebSocket upgrade (a GET) with 405.
+export const WS_URL = `ws://${metroHost}:8080/graphql-ws`;
 
 // AuthContext registers a handler here so a failed refresh can reset the app to
 // its signed-out state (clearing React state, not just tokens).
@@ -15,7 +21,7 @@ export function setUnauthenticatedHandler(fn: () => void) {
   onUnauthenticated = fn;
 }
 
-const AUTH_OPS = ['SignIn', 'SignUp', 'Refresh'];
+const AUTH_OPS = ['SignIn', 'SignUp', 'Refresh', 'GoogleSignIn', 'SignOut'];
 
 // Exchange the refresh token for a fresh access token, via a RAW fetch (not Apollo,
 // which would recurse through these links). Dedupes concurrent refreshes with a
@@ -80,7 +86,32 @@ const errorLink = onError(({ error, operation }) => {
   }
 });
 
+// A WebSocket can't carry an Authorization header, so the token goes in the
+// connection_init payload. connectionParams is a function so every (re)connect
+// picks up the current token rather than one captured at startup.
+const wsLink = new GraphQLWsLink(
+  createClient({
+    url: WS_URL,
+    lazy: true,
+    retryAttempts: Infinity,
+    connectionParams: async () => {
+      const token = await getAccessToken();
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
+  }),
+);
+
+// Subscriptions go over the socket; queries and mutations stay on HTTP.
+const transportLink = split(
+  ({ query }) => {
+    const def = getMainDefinition(query);
+    return def.kind === 'OperationDefinition' && def.operation === 'subscription';
+  },
+  wsLink,
+  from([authLink, new HttpLink({ uri: API_URL })]),
+);
+
 export const apolloClient = new ApolloClient({
-  link: from([errorLink, authLink, new HttpLink({ uri: API_URL })]),
+  link: from([errorLink, transportLink]),
   cache: new InMemoryCache(),
 });

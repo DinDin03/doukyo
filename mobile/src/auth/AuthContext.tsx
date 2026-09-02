@@ -1,7 +1,8 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { gql } from '@apollo/client';
 import { apolloClient, setUnauthenticatedHandler } from '../apollo';
-import { clearTokens, getAccessToken, saveTokens } from './tokens';
+import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from './tokens';
+import { getGoogleIdToken, signOutOfGoogle } from './google';
 
 export type AuthUser = { id: string; name: string; email: string };
 
@@ -30,6 +31,20 @@ const SIGN_UP = gql`
     }
   }
 `;
+const GOOGLE_SIGN_IN = gql`
+  mutation GoogleSignIn($idToken: String!) {
+    googleSignIn(idToken: $idToken) {
+      accessToken
+      refreshToken
+      user { id name email }
+    }
+  }
+`;
+const SIGN_OUT = gql`
+  mutation SignOut($refreshToken: String!) {
+    signOut(refreshToken: $refreshToken)
+  }
+`;
 
 type AuthPayload = { accessToken: string; refreshToken: string; user: AuthUser };
 
@@ -38,6 +53,7 @@ type AuthContextValue = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
+  googleSignIn: () => Promise<'signed-in' | 'cancelled'>;
   signOut: () => Promise<void>;
 };
 
@@ -91,13 +107,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.signUp.user);
   }, []);
 
+  const googleSignIn = useCallback(async (): Promise<'signed-in' | 'cancelled'> => {
+    const idToken = await getGoogleIdToken();
+    if (!idToken) return 'cancelled';
+    const { data } = await apolloClient.mutate<{ googleSignIn: AuthPayload }>({
+      mutation: GOOGLE_SIGN_IN,
+      variables: { idToken },
+    });
+    if (!data) throw new Error('Google sign in failed');
+    await saveTokens(data.googleSignIn.accessToken, data.googleSignIn.refreshToken);
+    setUser(data.googleSignIn.user);
+    return 'signed-in';
+  }, []);
+
   const signOut = useCallback(async () => {
+    const refreshToken = await getRefreshToken();
+    if (refreshToken) {
+      // Best-effort: revoke server-side so a leaked refresh token stops working.
+      // Never block local sign-out on this — offline sign-out must still work.
+      try {
+        await apolloClient.mutate({ mutation: SIGN_OUT, variables: { refreshToken } });
+      } catch {
+        // ignore — the token will just sit unused until it expires
+      }
+    }
+    await signOutOfGoogle();
     await clearTokens();
     await apolloClient.clearStore(); // drop any cached data belonging to the old user
     setUser(null);
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, googleSignIn, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

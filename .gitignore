@@ -28,3 +28,7 @@ npm-debug.*
 .env
 .env.*
 !.env.example
+
+# --- Generated / machine-specific ---
+graphify-out/
+.claude/
