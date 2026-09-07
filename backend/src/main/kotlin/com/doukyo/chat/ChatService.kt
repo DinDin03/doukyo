@@ -8,6 +8,8 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.OffsetDateTime
 
 @Service
@@ -48,7 +50,13 @@ class ChatService(
             Message(household = household, sender = sender, body = text, clientId = clientId),
         )
         val message = ChatMessage.from(saved)
-        publisher.publish(message)
+        // Publish AFTER commit, never inside the transaction: a rollback here would
+        // otherwise leave subscribers holding a message that no longer exists.
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() = publisher.publish(message)
+            },
+        )
         return message
     }
 
@@ -105,8 +113,11 @@ class ChatService(
 
     // The only authorisation rule in the whole feature: you must be in the house.
     // There is no separate chat roster to consult (design doc, D2).
+    fun isMember(householdId: Long, userId: Long): Boolean =
+        membershipRepository.existsByUserIdAndHouseholdId(userId, householdId)
+
     fun requireMember(householdId: Long, userId: Long) {
-        if (!membershipRepository.existsByUserIdAndHouseholdId(userId, householdId)) {
+        if (!isMember(householdId, userId)) {
             throw UnauthorizedException("You're not a member of this household")
         }
     }
