@@ -129,7 +129,7 @@ class ExpenseService(
     // sum invariant and lose the record of who paid what.
     @Transactional
     fun settleShare(shareId: Long, callerId: Long): ExpenseShare {
-        val share = expenseShareRepository.findByIdOrNull(shareId)
+        val share = expenseShareRepository.findByIdWithDetails(shareId)
             ?: throw IllegalArgumentException("No share with id $shareId")
         requireMember(share.expense.household.id!!, callerId)
         share.isPaid = true
