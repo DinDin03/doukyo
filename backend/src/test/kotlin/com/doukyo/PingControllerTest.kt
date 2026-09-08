@@ -18,12 +18,4 @@ class PingControllerTest(@Autowired val graphQlTester: GraphQlTester) {
         // The response carries a timestamp, so assert the shape, not the exact text.
         assertThat(body).startsWith("pong")
     }
-
-    @Test
-    fun `greeting and hello answer`() {
-        assertThat(graphQlTester.document("{ greeting }").execute()
-            .path("greeting").entity(String::class.java).get()).contains("share house")
-        assertThat(graphQlTester.document("{ hello }").execute()
-            .path("hello").entity(String::class.java).get()).isEqualTo("Hello World")
-    }
 }
