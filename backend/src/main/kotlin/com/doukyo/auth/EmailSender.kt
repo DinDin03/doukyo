@@ -1,7 +1,6 @@
 package com.doukyo.auth
 
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Component
 
 // The seam between the sign-up flow and however mail actually goes out. An
 // interface so the whole flow is buildable and testable before any provider
@@ -16,17 +15,11 @@ interface EmailSender {
     fun sendSignUpAttemptOnExistingAccount(email: String)
 }
 
-// Development default: prints the code to the log. A real provider replaces it by
-// being declared @Primary (which is how the tests substitute a recording fake).
+// Fallback when no SMTP server is configured: prints the code to the log so the
+// flow is usable in development without a mail account.
 //
-// NOT @ConditionalOnMissingBean: that annotation is for @Bean methods in
-// auto-configuration, evaluated after user beans register. On a scanned
-// @Component the ordering is undefined, and it silently skipped registration —
-// the app failed to start with "No qualifying bean of type EmailSender", which
-// the tests could not catch because they inject their own @Primary double.
-//
-// This MUST NOT reach production, or it becomes a "log every code" feature.
-@Component
+// This MUST NOT reach production — it is a "log every verification code" feature.
+// EmailConfig picks it only when mail is unconfigured, and logs a warning saying so.
 class LoggingEmailSender : EmailSender {
 
     private val log = LoggerFactory.getLogger(javaClass)

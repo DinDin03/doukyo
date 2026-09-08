@@ -185,7 +185,7 @@ class EmailVerificationTest : AbstractIntegrationTest() {
     }
 
     @Test
-    fun `too many wrong guesses destroys the code even if the next guess is right`() {
+    fun `too many wrong guesses locks the code even if the next guess is right`() {
         // The guess limit — not the 6 digits — is what actually protects a code
         // with only a million possibilities.
         authService.startSignUp("Alice", "alice@test.app", "password123")
@@ -197,8 +197,66 @@ class EmailVerificationTest : AbstractIntegrationTest() {
 
         assertThatThrownBy { authService.confirmSignUp("alice@test.app", code) }
             .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Too many attempts")
         assertThat(userRepository.findAll()).isEmpty()
-        assertThat(pendingSignUpRepository.findByEmail("alice@test.app")).isNull()
+        // The row SURVIVES, holding the deadline. Deleting it would let the caller
+        // request a fresh code and a fresh set of attempts — no lockout at all.
+        assertThat(pendingSignUpRepository.findByEmail("alice@test.app")!!.lockedUntil).isNotNull()
+    }
+
+    @Test
+    fun `a wrong code reports how many attempts are left`() {
+        authService.startSignUp("Alice", "alice@test.app", "password123")
+
+        assertThatThrownBy { authService.confirmSignUp("alice@test.app", "000000") }
+            .hasMessageContaining("${AuthService.MAX_CODE_ATTEMPTS - 1} attempts left")
+        assertThatThrownBy { authService.confirmSignUp("alice@test.app", "000000") }
+            .hasMessageContaining("${AuthService.MAX_CODE_ATTEMPTS - 2} attempts left")
+    }
+
+    @Test
+    fun `the last remaining attempt is described in the singular`() {
+        authService.startSignUp("Alice", "alice@test.app", "password123")
+        repeat(AuthService.MAX_CODE_ATTEMPTS - 2) {
+            runCatching { authService.confirmSignUp("alice@test.app", "000000") }
+        }
+        assertThatThrownBy { authService.confirmSignUp("alice@test.app", "000000") }
+            .hasMessageContaining("1 attempt left")
+    }
+
+    @Test
+    fun `resending does NOT bypass the lockout`() {
+        authService.startSignUp("Alice", "alice@test.app", "password123")
+        repeat(AuthService.MAX_CODE_ATTEMPTS) {
+            runCatching { authService.confirmSignUp("alice@test.app", "000000") }
+        }
+        emailSender.clear()
+
+        // Still answers true (uniform response), but sends nothing — otherwise a
+        // locked-out caller just asks for a new code and starts guessing again.
+        assertThat(authService.startSignUp("Alice", "alice@test.app", "password123")).isTrue()
+        assertThat(emailSender.codes).isEmpty()
+    }
+
+    @Test
+    fun `the lockout lifts once the deadline passes`() {
+        authService.startSignUp("Alice", "alice@test.app", "password123")
+        repeat(AuthService.MAX_CODE_ATTEMPTS) {
+            runCatching { authService.confirmSignUp("alice@test.app", "000000") }
+        }
+
+        val locked = pendingSignUpRepository.findByEmail("alice@test.app")!!
+        locked.lockedUntil = OffsetDateTime.now().minusSeconds(1)
+        // A real 5-minute lockout always outlives the 60-second resend throttle,
+        // so age the record too rather than testing a state that cannot occur.
+        locked.createdAt = OffsetDateTime.now().minusMinutes(5)
+        pendingSignUpRepository.save(locked)
+        emailSender.clear()
+
+        // A fresh code is issued and the attempt budget resets.
+        authService.startSignUp("Alice", "alice@test.app", "password123")
+        val newCode = codeSentTo("alice@test.app")
+        assertThat(authService.confirmSignUp("alice@test.app", newCode).user.name).isEqualTo("Alice")
     }
 
     @Test

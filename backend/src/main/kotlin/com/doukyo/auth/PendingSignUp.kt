@@ -31,6 +31,11 @@ class PendingSignUp(
     @Column(name = "expires_at", nullable = false)
     var expiresAt: OffsetDateTime,
 
+    // Set when attempts run out. Blocks both confirming AND resending until it
+    // passes, otherwise the lockout is bypassed by asking for a new code.
+    @Column(name = "locked_until")
+    var lockedUntil: OffsetDateTime? = null,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: OffsetDateTime = OffsetDateTime.now(),
 

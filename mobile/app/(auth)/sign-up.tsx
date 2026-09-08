@@ -40,18 +40,22 @@ export default function SignUp() {
     }
   };
 
-  const sendCode = () =>
-    run(async () => {
-      await startSignUp(name.trim(), email.trim(), password);
-      setCodeSent(true);
-      setNotice(null);
-    });
+  // Optimistic: move to the code screen immediately and let the request finish in
+  // the background. The response carries no information — startSignUp always
+  // answers the same thing — so there is nothing to wait for. Waiting would pin
+  // the user on "Sending…" for the length of an SMTP round trip.
+  const sendCode = () => {
+    setError(null);
+    setNotice(null);
+    setCodeSent(true);
+    startSignUp(name.trim(), email.trim(), password).catch((e) => setError(authError(e)));
+  };
 
-  const resend = () =>
-    run(async () => {
-      await startSignUp(name.trim(), email.trim(), password);
-      setNotice('If it hasn’t arrived, give it a minute before trying again.');
-    });
+  const resend = () => {
+    setError(null);
+    setNotice('If it hasn’t arrived, give it a minute before trying again.');
+    startSignUp(name.trim(), email.trim(), password).catch((e) => setError(authError(e)));
+  };
 
   // The auth gate takes over once this sets a user.
   const verify = () => run(() => confirmSignUp(email.trim(), code.trim()));
@@ -105,9 +109,9 @@ export default function SignUp() {
           ) : null}
 
           <Button
-            label={busy ? 'Sending…' : 'Send code'}
+            label="Send code"
             block
-            disabled={busy || !name.trim() || !email.trim() || password.length < 8}
+            disabled={!name.trim() || !email.trim() || password.length < 8}
             onPress={sendCode}
             style={{ marginTop: 22 }}
           />
@@ -176,7 +180,6 @@ export default function SignUp() {
             label="Resend code"
             variant="secondary"
             block
-            disabled={busy}
             onPress={resend}
             style={{ marginTop: 10 }}
           />
