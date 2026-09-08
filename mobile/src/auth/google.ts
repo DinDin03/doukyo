@@ -10,6 +10,11 @@ GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
 // user dismissed it. Throws for real failures (no Play Services, network, etc).
 export async function getGoogleIdToken(): Promise<string | null> {
   await GoogleSignin.hasPlayServices();
+  // Drop the SDK's cached account first, so the picker always appears. Without
+  // this, signIn() returns the last-used account silently — there is then no way
+  // to choose a different one, and after the server's user row is gone it looks
+  // like an automatic login when it is really a fresh sign-up.
+  await signOutOfGoogle();
   const result = await GoogleSignin.signIn();
   if (result.type !== 'success') return null;
   return result.data.idToken;
