@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { gql } from '@apollo/client';
 import { apolloClient } from '../apollo';
 
@@ -81,10 +82,15 @@ export function useExpenses(householdId: string | undefined) {
     }
   }, [householdId]);
 
-  useEffect(() => {
-    setLoading(true);
-    refresh();
-  }, [refresh]);
+  // Refetch whenever the screen regains focus, not just on mount. Each caller of
+  // this hook holds its own state, so the Add screen refreshing its copy does
+  // nothing for the Expenses tab's copy — without this, returning from Add shows
+  // a list that is missing the expense just created.
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
 
   const createExpense = useCallback(
     async (input: {

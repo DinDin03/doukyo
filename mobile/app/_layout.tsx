@@ -39,19 +39,33 @@ function RootNavigator() {
   useEffect(() => {
     if (!settled) return;
     const group = segments[0];
-    const target = !user ? '(auth)' : households.length === 0 ? '(household)' : '(tabs)';
+    const inAuth = group === '(auth)';
+    const inHousehold = group === '(household)';
+
+    // Ask "is this a place I'm ALLOWED to be", not "is this the one place I
+    // belong". A single target would treat every standalone route (/add,
+    // /balances, /activity, /recipe) as misplaced and bounce it straight back
+    // to the tabs — which looks exactly like the app reloading.
+    const misplaced = !user
+      ? !inAuth // signed out: only the auth screens
+      : households.length === 0
+        ? !inHousehold // no household yet: only the create/join flow
+        : inAuth || inHousehold; // signed in with a household: anywhere but those two
+
     const swap = () => {
-      if (target === '(auth)') router.replace('/(auth)/sign-in');
+      if (!user) router.replace('/(auth)/sign-in')
       // Named leaf rather than an index route: "/" already resolves to (tabs)/index,
       // so a second group-level index would be a duplicate claim on the same path.
-      else if (target === '(household)') router.replace('/(household)/choose');
+      else if (households.length === 0) router.replace('/(household)/choose');
       else router.replace('/(tabs)');
     };
 
     if (!hasRevealed.current) {
       hasRevealed.current = true;
-      play(swap); // first reveal always plays, even with no redirect needed
-    } else if (group !== target) {
+      play(() => {
+        if (misplaced) swap();
+      }); // first reveal always plays, even with no redirect needed
+    } else if (misplaced) {
       play(swap);
     }
   }, [user, households.length, settled, segments, router, play]);
