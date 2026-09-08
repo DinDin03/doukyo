@@ -58,7 +58,7 @@ class GraphQlErrorMappingTest : AbstractIntegrationTest() {
     @Test
     fun `validation errors carry the real message for a bad signUp`() {
         graphQlTester
-            .document("""mutation { signUp(name: "A", email: "a@test.app", password: "short") { accessToken } }""")
+            .document("""mutation { startSignUp(name: "A", email: "a@test.app", password: "short") }""")
             .execute()
             .errors()
             .satisfy { errors ->
@@ -92,13 +92,12 @@ class GraphQlErrorMappingTest : AbstractIntegrationTest() {
 
     @Test
     fun `a successful mutation still returns data`() {
+        // startSignUp answers true whether or not the address is taken.
         graphQlTester
-            .document("""mutation { signUp(name: "Alice", email: "alice@test.app", password: "password123") { user { name } } }""")
+            .document("""mutation { startSignUp(name: "Alice", email: "alice@test.app", password: "password123") }""")
             .execute()
-            .path("signUp.user.name")
-            .entity(String::class.java)
-            .isEqualTo("Alice")
-
-        assertThat(authService.signIn("alice@test.app", "password123").accessToken).isNotBlank()
+            .path("startSignUp")
+            .entity(Boolean::class.java)
+            .isEqualTo(true)
     }
 }

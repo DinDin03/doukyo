@@ -22,6 +22,12 @@ class AuthServiceTest : AbstractIntegrationTest() {
     // on identities we control (verified vs unverified email).
     @MockBean private lateinit var googleTokenVerifier: GoogleTokenVerifier
 
+    // Sign-up is two steps now, so the fixture completes both.
+    private fun signUp(name: String, email: String, password: String): AuthPayload {
+        authService.startSignUp(name, email, password)
+        return authService.confirmSignUp(email, codeSentTo(email))
+    }
+
     private fun google(sub: String, email: String, verified: Boolean = true, name: String = "Googler") =
         GoogleIdentity(subject = sub, email = email, emailVerified = verified, name = name)
 
@@ -29,7 +35,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `signUp creates the user and returns both tokens`() {
-        val payload = authService.signUp("Alice", "alice@test.app", "password123")
+        val payload = signUp("Alice", "alice@test.app", "password123")
 
         assertThat(payload.user.name).isEqualTo("Alice")
         assertThat(payload.accessToken).isNotBlank()
@@ -39,25 +45,25 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `signUp stores a bcrypt hash, never the plaintext`() {
-        val payload = authService.signUp("Alice", "alice@test.app", "password123")
+        val payload = signUp("Alice", "alice@test.app", "password123")
         val hash = userRepository.findByEmail("alice@test.app")!!.passwordHash!!
 
         assertThat(hash).isNotEqualTo("password123")
         assertThat(hash).startsWith("\$2")
         assertThat(passwordEncoder.matches("password123", hash)).isTrue()
-        assertThat(payload.user.emailVerified).isFalse()
+        assertThat(payload.user.emailVerified).isTrue()
     }
 
     @Test
     fun `signUp normalizes the email and trims the name`() {
-        authService.signUp("  Alice  ", "  ALICE@Test.App  ", "password123")
+        signUp("  Alice  ", "  ALICE@Test.App  ", "password123")
         assertThat(userRepository.findByEmail("alice@test.app")?.name).isEqualTo("Alice")
     }
 
     @Test
     fun `signUp rejects a blank name`() {
         listOf("", "   ").forEach {
-            assertThatThrownBy { authService.signUp(it, "a@test.app", "password123") }
+            assertThatThrownBy { signUp(it, "a@test.app", "password123") }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessage("Please enter your name")
         }
@@ -65,41 +71,33 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `signUp rejects a password shorter than 8 characters`() {
-        assertThatThrownBy { authService.signUp("Alice", "a@test.app", "1234567") }
+        assertThatThrownBy { signUp("Alice", "a@test.app", "1234567") }
             .isInstanceOf(IllegalArgumentException::class.java)
             .hasMessage("Password must be at least 8 characters")
     }
 
     @Test
     fun `signUp accepts a password of exactly 8 characters`() {
-        assertThat(authService.signUp("Alice", "a@test.app", "12345678").accessToken).isNotBlank()
-    }
-
-    @Test
-    fun `signUp rejects a duplicate email regardless of case`() {
-        authService.signUp("Alice", "alice@test.app", "password123")
-        assertThatThrownBy { authService.signUp("Impostor", "ALICE@TEST.APP", "password123") }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessage("An account with that email already exists")
+        assertThat(signUp("Alice", "a@test.app", "12345678").accessToken).isNotBlank()
     }
 
     // --- signIn ---
 
     @Test
     fun `signIn succeeds with the right password`() {
-        authService.signUp("Alice", "alice@test.app", "password123")
+        signUp("Alice", "alice@test.app", "password123")
         assertThat(authService.signIn("alice@test.app", "password123").user.name).isEqualTo("Alice")
     }
 
     @Test
     fun `signIn is case and whitespace insensitive on email`() {
-        authService.signUp("Alice", "alice@test.app", "password123")
+        signUp("Alice", "alice@test.app", "password123")
         assertThat(authService.signIn("  ALICE@Test.App ", "password123").accessToken).isNotBlank()
     }
 
     @Test
     fun `signIn gives one generic error for wrong password and unknown email alike`() {
-        authService.signUp("Alice", "alice@test.app", "password123")
+        signUp("Alice", "alice@test.app", "password123")
 
         // Identical messages: the login form must not become an account-enumeration oracle.
         assertThatThrownBy { authService.signIn("alice@test.app", "wrong-password") }
@@ -121,7 +119,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `refresh issues a new pair`() {
-        val first = authService.signUp("Alice", "alice@test.app", "password123")
+        val first = signUp("Alice", "alice@test.app", "password123")
         val second = authService.refresh(first.refreshToken)
 
         assertThat(second.refreshToken).isNotEqualTo(first.refreshToken)
@@ -130,7 +128,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `refresh rotates - the spent token cannot be reused`() {
-        val first = authService.signUp("Alice", "alice@test.app", "password123")
+        val first = signUp("Alice", "alice@test.app", "password123")
         authService.refresh(first.refreshToken)
 
         assertThatThrownBy { authService.refresh(first.refreshToken) }
@@ -164,7 +162,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `signOut revokes the refresh token`() {
-        val payload = authService.signUp("Alice", "alice@test.app", "password123")
+        val payload = signUp("Alice", "alice@test.app", "password123")
         authService.signOut(payload.refreshToken)
 
         assertThatThrownBy { authService.refresh(payload.refreshToken) }
@@ -173,7 +171,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `signOut is idempotent and never errors on an unknown token`() {
-        val payload = authService.signUp("Alice", "alice@test.app", "password123")
+        val payload = signUp("Alice", "alice@test.app", "password123")
         authService.signOut(payload.refreshToken)
         authService.signOut(payload.refreshToken) // already revoked
         authService.signOut("never-issued")       // unknown
@@ -181,7 +179,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `signOut does not revoke other sessions`() {
-        val phone = authService.signUp("Alice", "alice@test.app", "password123")
+        val phone = signUp("Alice", "alice@test.app", "password123")
         val laptop = authService.signIn("alice@test.app", "password123")
 
         authService.signOut(phone.refreshToken)
@@ -215,7 +213,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `googleSignIn links to an existing password account when Google verified the email`() {
-        val existing = authService.signUp("Alice", "alice@test.app", "password123")
+        val existing = signUp("Alice", "alice@test.app", "password123")
         given(googleTokenVerifier.verify("tok")).willReturn(google("g-1", "alice@test.app", verified = true))
 
         val linked = authService.googleSignIn("tok")
@@ -230,7 +228,7 @@ class AuthServiceTest : AbstractIntegrationTest() {
 
     @Test
     fun `googleSignIn refuses to link on an unverified email`() {
-        authService.signUp("Alice", "alice@test.app", "password123")
+        signUp("Alice", "alice@test.app", "password123")
         given(googleTokenVerifier.verify("tok")).willReturn(google("g-1", "alice@test.app", verified = false))
 
         // Otherwise anyone could claim a victim's address on a Google account they

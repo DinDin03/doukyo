@@ -22,9 +22,14 @@ const SIGN_IN = gql`
     }
   }
 `;
-const SIGN_UP = gql`
-  mutation SignUp($name: String!, $email: String!, $password: String!) {
-    signUp(name: $name, email: $email, password: $password) {
+const START_SIGN_UP = gql`
+  mutation StartSignUp($name: String!, $email: String!, $password: String!) {
+    startSignUp(name: $name, email: $email, password: $password)
+  }
+`;
+const CONFIRM_SIGN_UP = gql`
+  mutation ConfirmSignUp($email: String!, $code: String!) {
+    confirmSignUp(email: $email, code: $code) {
       accessToken
       refreshToken
       user { id name email }
@@ -52,7 +57,10 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  // Two steps: startSignUp emails a code, confirmSignUp exchanges it for a
+  // session. startSignUp resolves whether or not the address is registered.
+  startSignUp: (name: string, email: string, password: string) => Promise<void>;
+  confirmSignUp: (email: string, code: string) => Promise<void>;
   googleSignIn: () => Promise<'signed-in' | 'cancelled'>;
   signOut: () => Promise<void>;
 };
@@ -100,11 +108,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.signIn.user);
   }, []);
 
-  const signUp = useCallback(async (name: string, email: string, password: string) => {
-    const { data } = await apolloClient.mutate<{ signUp: AuthPayload }>({ mutation: SIGN_UP, variables: { name, email, password } });
+  const startSignUp = useCallback(async (name: string, email: string, password: string) => {
+    await apolloClient.mutate({ mutation: START_SIGN_UP, variables: { name, email, password } });
+  }, []);
+
+  const confirmSignUp = useCallback(async (email: string, code: string) => {
+    const { data } = await apolloClient.mutate<{ confirmSignUp: AuthPayload }>({
+      mutation: CONFIRM_SIGN_UP,
+      variables: { email, code },
+    });
     if (!data) throw new Error('Sign up failed');
-    await saveTokens(data.signUp.accessToken, data.signUp.refreshToken);
-    setUser(data.signUp.user);
+    await saveTokens(data.confirmSignUp.accessToken, data.confirmSignUp.refreshToken);
+    setUser(data.confirmSignUp.user);
   }, []);
 
   const googleSignIn = useCallback(async (): Promise<'signed-in' | 'cancelled'> => {
@@ -138,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, googleSignIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, startSignUp, confirmSignUp, googleSignIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

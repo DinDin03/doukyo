@@ -20,21 +20,109 @@ class AuthService(
     private val jwtService: JwtService,
     private val passwordEncoder: PasswordEncoder,
     private val googleTokenVerifier: GoogleTokenVerifier,
+    private val pendingSignUpRepository: PendingSignUpRepository,
+    private val emailSender: EmailSender,
     @Value("\${doukyo.security.refresh-ttl-days}") private val refreshTtlDays: Long,
 ) {
     private val secureRandom = SecureRandom()
 
+    companion object {
+        const val MAX_CODE_ATTEMPTS = 5
+        const val CODE_TTL_MINUTES = 10L
+        const val RESEND_INTERVAL_SECONDS = 60L
+        // One message for every failure mode in confirmSignUp.
+        const val INVALID_CODE = "That code is invalid or has expired"
+    }
+
+    // STEP ONE. Emails a code and returns true — ALWAYS true, whether or not the
+    // address already has an account. Answering differently would turn the sign-up
+    // form into an account-enumeration oracle, the same reason signIn has a single
+    // generic error. The difference goes in the email instead, where only the owner
+    // of the inbox can read it.
     @Transactional
-    fun signUp(name: String, email: String, password: String): AuthPayload {
+    fun startSignUp(name: String, email: String, password: String): Boolean {
         val cleanEmail = email.trim().lowercase()
+        // The caller's own input — rejecting it leaks nothing about other accounts.
         require(name.isNotBlank()) { "Please enter your name" }
+        require(cleanEmail.contains("@")) { "Please enter a valid email" }
         require(password.length >= 8) { "Password must be at least 8 characters" }
+
+        if (userRepository.existsByEmail(cleanEmail)) {
+            pendingSignUpRepository.findByEmail(cleanEmail)?.let(pendingSignUpRepository::delete)
+            emailSender.sendSignUpAttemptOnExistingAccount(cleanEmail)
+            return true
+        }
+
+        val existing = pendingSignUpRepository.findByEmail(cleanEmail)
+        // Throttle resends: without this we are an email cannon aimed at whatever
+        // address the caller types.
+        if (existing != null && existing.createdAt.isAfter(OffsetDateTime.now().minusSeconds(RESEND_INTERVAL_SECONDS))) {
+            return true
+        }
+
+        val code = randomCode()
+        val now = OffsetDateTime.now()
+        // Replacing rather than adding keeps exactly one code live per address, so
+        // an attacker cannot collect candidates and try them in parallel.
+        val pending = existing ?: PendingSignUp(
+            email = cleanEmail,
+            name = name.trim(),
+            passwordHash = "",
+            codeHash = "",
+            expiresAt = now,
+        )
+        pending.name = name.trim()
+        pending.passwordHash = passwordEncoder.encode(password)
+        pending.codeHash = sha256(code)
+        pending.attempts = 0
+        pending.createdAt = now
+        pending.expiresAt = now.plusMinutes(CODE_TTL_MINUTES)
+        pendingSignUpRepository.save(pending)
+
+        emailSender.sendSignUpCode(cleanEmail, code)
+        return true
+    }
+
+    // STEP TWO. The code is the credential, so this needs no existing session.
+    //
+    // noRollbackFor is load-bearing, not tidiness: a wrong code throws, and a
+    // throw inside @Transactional rolls the transaction back — including the
+    // attempts increment. That silently disables the guess limit, which is the
+    // ONLY thing protecting a code with a million possibilities. The failed
+    // attempt has to survive the failure.
+    @Transactional(noRollbackFor = [IllegalArgumentException::class])
+    fun confirmSignUp(email: String, code: String): AuthPayload {
+        val cleanEmail = email.trim().lowercase()
+        val pending = pendingSignUpRepository.findByEmail(cleanEmail)
+            ?: throw IllegalArgumentException(INVALID_CODE)
+
+        // Six digits is a million possibilities — the ATTEMPT LIMIT is what makes
+        // that safe, not the digits and not the hash. Burn the code once it's hit.
+        if (pending.attempts >= MAX_CODE_ATTEMPTS || pending.expiresAt.isBefore(OffsetDateTime.now())) {
+            pendingSignUpRepository.delete(pending)
+            throw IllegalArgumentException(INVALID_CODE)
+        }
+        if (pending.codeHash != sha256(code.trim())) {
+            pending.attempts += 1
+            if (pending.attempts >= MAX_CODE_ATTEMPTS) pendingSignUpRepository.delete(pending)
+            // Same message for wrong, expired and unknown — anything else tells an
+            // attacker which part to change.
+            throw IllegalArgumentException(INVALID_CODE)
+        }
+
+        // Safe to be specific: holding a valid code already proves control of the
+        // inbox, so this reveals nothing they could not learn anyway.
         require(!userRepository.existsByEmail(cleanEmail)) { "An account with that email already exists" }
 
-        // encode() = BCrypt hash. The plaintext password is never stored or logged.
         val user = userRepository.save(
-            User(name = name.trim(), email = cleanEmail, passwordHash = passwordEncoder.encode(password)),
+            User(
+                name = pending.name,
+                email = cleanEmail,
+                passwordHash = pending.passwordHash,
+                emailVerified = true,
+            ),
         )
+        pendingSignUpRepository.delete(pending) // single use
         return issueTokens(user)
     }
 
@@ -134,6 +222,8 @@ class AuthService(
         secureRandom.nextBytes(bytes)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
+
+    private fun randomCode(): String = (1..6).map { secureRandom.nextInt(10) }.joinToString("")
 
     private fun sha256(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
