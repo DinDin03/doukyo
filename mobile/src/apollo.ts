@@ -21,7 +21,7 @@ export function setUnauthenticatedHandler(fn: () => void) {
   onUnauthenticated = fn;
 }
 
-const AUTH_OPS = ['SignIn', 'SignUp', 'Refresh', 'GoogleSignIn', 'SignOut'];
+const AUTH_OPS = ['SignIn', 'StartSignUp', 'ConfirmSignUp', 'Refresh', 'GoogleSignIn', 'SignOut'];
 
 // Exchange the refresh token for a fresh access token, via a RAW fetch (not Apollo,
 // which would recurse through these links). Dedupes concurrent refreshes with a

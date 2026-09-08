@@ -41,7 +41,12 @@ type Mutation {
     joinHousehold(code: String!): Household!
 
     # --- Auth ---
-    signUp(name: String!, email: String!, password: String!): AuthPayload!
+    # Sign-up is two steps. Step one emails a six-digit code and ALWAYS returns
+    # true — answering differently would reveal whether an address is registered.
+    startSignUp(name: String!, email: String!, password: String!): Boolean!
+    # Step two exchanges the code for the account and its tokens. The code is the
+    # credential, so no session is needed. Single use, 10 minutes, 5 attempts.
+    confirmSignUp(email: String!, code: String!): AuthPayload!
     signIn(email: String!, password: String!): AuthPayload!
     refresh(refreshToken: String!): AuthPayload!
     # idToken = the Google-signed ID token the app receives after a Google

@@ -1,10 +1,14 @@
 package com.doukyo
 
+import com.doukyo.auth.EmailSender
 import com.doukyo.user.User
 import com.doukyo.user.UserRepository
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -24,6 +28,7 @@ import java.sql.DriverManager
 // Requires `docker compose up -d` first. The test DATABASE is created automatically,
 // separate from dev data, and truncated between tests.
 @SpringBootTest
+@org.springframework.context.annotation.Import(TestEmailConfig::class)
 abstract class AbstractIntegrationTest {
 
     @Autowired
@@ -31,6 +36,18 @@ abstract class AbstractIntegrationTest {
 
     @Autowired
     protected lateinit var userRepository: UserRepository
+
+    // A real fake, not a Mockito mock: ArgumentCaptor.capture() and eq() both
+    // return null, which Kotlin's non-null parameter checks reject. Recording the
+    // calls directly is shorter and reads better than working around that.
+    @Autowired
+    protected lateinit var emailSender: RecordingEmailSender
+
+    // The emailed code is stored hashed and never returned, so this is the only
+    // way a test can complete a sign-up.
+    protected fun codeSentTo(email: String): String =
+        emailSender.codes[email.trim().lowercase()]
+            ?: error("No sign-up code was emailed to $email")
 
     // A persisted user with no credentials. Auth tests build users through
     // AuthService instead, so they exercise hashing.
@@ -41,12 +58,21 @@ abstract class AbstractIntegrationTest {
     // transactions, and ChatService publishes on afterCommit — a test-owned
     // transaction that always rolled back would silently skip that path.
     @BeforeEach
+    fun resetEmails() = emailSender.clear()
+
+    // The table list is read from the database rather than hardcoded. A literal
+    // list silently rots the moment a migration adds a table — pending_signups
+    // was missed exactly that way, and stale rows then leaked between tests.
+    @BeforeEach
     fun resetDatabase() {
-        jdbc.execute(
-            "TRUNCATE messages, message_reads, expense_shares, expenses, " +
-                "refresh_tokens, oauth_accounts, memberships, households, users " +
-                "RESTART IDENTITY CASCADE",
+        val tables = jdbc.queryForList(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' " +
+                "AND tablename <> 'flyway_schema_history'",
+            String::class.java,
         )
+        if (tables.isNotEmpty()) {
+            jdbc.execute("TRUNCATE ${tables.joinToString()} RESTART IDENTITY CASCADE")
+        }
     }
 
     companion object {
@@ -79,4 +105,35 @@ abstract class AbstractIntegrationTest {
             registry.add("spring.datasource.password") { PASSWORD }
         }
     }
+}
+
+class RecordingEmailSender : EmailSender {
+    val codes = mutableMapOf<String, String>()
+    var sendCount = 0
+    val existingAccountNotices = mutableListOf<String>()
+
+    override fun sendSignUpCode(email: String, code: String) {
+        codes[email] = code
+        sendCount += 1
+    }
+
+    override fun sendSignUpAttemptOnExistingAccount(email: String) {
+        existingAccountNotices += email
+    }
+
+    fun clear() {
+        codes.clear()
+        existingAccountNotices.clear()
+        sendCount = 0
+    }
+}
+
+// @Primary so it wins over the production LoggingEmailSender. Declared here so
+// every integration test shares one Spring context rather than spinning up a new
+// one per test class.
+@TestConfiguration
+class TestEmailConfig {
+    @Bean
+    @Primary
+    fun recordingEmailSender() = RecordingEmailSender()
 }

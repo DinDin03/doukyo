@@ -15,9 +15,14 @@ class AuthController(
     private val authService: AuthService,
     private val userRepository: UserRepository,
 ) {
+    // Always true, whatever happened — see AuthService.startSignUp.
     @MutationMapping
-    fun signUp(@Argument name: String, @Argument email: String, @Argument password: String): AuthPayload =
-        authService.signUp(name, email, password)
+    fun startSignUp(@Argument name: String, @Argument email: String, @Argument password: String): Boolean =
+        authService.startSignUp(name, email, password)
+
+    @MutationMapping
+    fun confirmSignUp(@Argument email: String, @Argument code: String): AuthPayload =
+        authService.confirmSignUp(email, code)
 
     @MutationMapping
     fun signIn(@Argument email: String, @Argument password: String): AuthPayload =

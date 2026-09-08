@@ -47,11 +47,32 @@ spring:
       # answers the WebSocket upgrade (a GET) with 405.
       path: /graphql-ws
 
+  # --- Mail ---
+  # Host/username/password are NEVER committed. Spring reads them from the
+  # environment automatically: SPRING_MAIL_HOST, SPRING_MAIL_PORT,
+  # SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD. With no host set, Spring Boot
+  # creates no JavaMailSender and EmailConfig falls back to logging the code.
+  mail:
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          # Fail fast instead of hanging a request thread on a dead SMTP server.
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 server:
   port: 8080
 
 # --- Auth / JWT (Slice 1) ---
 doukyo:
+  # The From address, e.g. "Doukyo <onboarding@resend.dev>". Set DOUKYO_MAIL_FROM.
+  mail:
+    from: ${DOUKYO_MAIL_FROM:}
+
   security:
     # HS256 signing key, Base64-encoded (>= 32 bytes when decoded). DEV ONLY —
     # in production this MUST come from an env var / secret manager, never git.

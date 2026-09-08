@@ -25,5 +25,9 @@ services:
       timeout: 3s
       retries: 5
 
+  # A real SMTP server that catches mail instead of delivering it, with a web UI
+  # at http://localhost:8025. Lets the whole email flow — SMTP handshake, MIME
+  # parts, HTML rendering — be exercised and eyeballed with no provider account
+  # and no credentials. Point a real provider at it later by changing env vars.
 volumes:
   doukyo_pgdata:                  # named volume => data survives `down`, dies on `down -v`

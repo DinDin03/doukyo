@@ -42,6 +42,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     // Bean Validation (@NotNull, @Positive, ...) — we'll lean on this for input rules.
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // JavaMailSender + MIME. SMTP rather than a provider SDK: every provider
+    // (Resend, Postmark, SendGrid, Gmail) speaks it, so switching is config, not code.
+    implementation("org.springframework.boot:spring-boot-starter-mail")
 
     // --- Kotlin support ---
     // Teaches Jackson (JSON) how to construct Kotlin classes (no-arg constructors,
