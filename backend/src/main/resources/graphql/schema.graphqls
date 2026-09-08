@@ -7,10 +7,8 @@
 # TypeScript types from it).
 
 type Query {
-    # `String!` — the `!` means non-null: a successful ping ALWAYS returns a string.
+    # Health check. `String!` — the `!` means non-null.
     ping: String!
-    greeting: String!
-    hello: String!
 
     # --- Households ---
     myHouseholds: [Household!]!        # households the current user belongs to
