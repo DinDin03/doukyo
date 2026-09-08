@@ -24,6 +24,10 @@ type Query {
     messagesSince(householdId: ID!, after: ID!): [Message!]!
     unreadMessageCount(householdId: ID!): Int!
 
+    # --- Expenses ---
+    expenses(householdId: ID!): [Expense!]!   # newest first
+    balances(householdId: ID!): [Balance!]!   # net position per member; always sums to zero
+
     # --- Auth ---
     me: User!                          # the currently signed-in user (errors if not)
 }
@@ -53,6 +57,21 @@ type Mutation {
     sendMessage(householdId: ID!, body: String!, clientId: String!): Message!
     # Moves the read bookmark forward (never backwards). Returns the new position.
     markMessagesRead(householdId: ID!, messageId: ID!): Int!
+
+    # --- Expenses ---
+    # `participants` carries one entry per person sharing the cost. What `value`
+    # means depends on `method` — see ParticipantInput.
+    createExpense(
+        householdId: ID!,
+        paidById: ID!,
+        description: String!,
+        amountCents: Int!,
+        category: ExpenseCategory!,
+        method: SplitMethod!,
+        participants: [ParticipantInput!]!
+    ): Expense!
+    # Marks one person's share of one expense as paid. Never deletes it.
+    settleShare(shareId: ID!): ExpenseShare!
 }
 
 # A person. For now this mirrors the `users` table / User entity directly.
@@ -96,4 +115,48 @@ type MessageAuthor {
 # Live delivery. Only messages for the given household reach this stream.
 type Subscription {
     messageAdded(householdId: ID!): Message!
+}
+
+# --- Expenses ---
+
+enum ExpenseCategory { GROCERIES, BILLS, DINING, HOUSEHOLD, OTHER }
+
+enum SplitMethod {
+    EVENLY      # value ignored
+    EXACT       # value = that person's share in cents; must sum to amountCents
+    PERCENTAGE  # value = basis points (10000 = 100%); must sum to 10000
+    WEIGHTS     # value = a relative weight, e.g. 2:1:1
+}
+
+input ParticipantInput {
+    userId: ID!
+    # Meaning depends on the SplitMethod — cents, basis points, or a weight.
+    value: Int
+}
+
+# Money is always integer cents; $84.00 is 8400. GraphQL's Int is 32-bit, which
+# caps a single expense at about $21 million — far past anything a share house
+# will enter, and the cap is enforced by the schema itself.
+type Expense {
+    id: ID!
+    description: String!
+    amountCents: Int!
+    category: ExpenseCategory!
+    createdAt: String!
+    paidBy: User!
+    shares: [ExpenseShare!]!   # always sums to amountCents
+}
+
+type ExpenseShare {
+    id: ID!
+    user: User!
+    amountCents: Int!
+    isPaid: Boolean!
+}
+
+# Positive = the house owes you. Negative = you owe the house.
+type Balance {
+    userId: ID!
+    userName: String!
+    netCents: Int!
 }

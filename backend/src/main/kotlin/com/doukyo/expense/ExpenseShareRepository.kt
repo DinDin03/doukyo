@@ -20,4 +20,16 @@ interface ExpenseShareRepository : JpaRepository<ExpenseShare, Long> {
             "where e.household.id = :householdId and s.isPaid = false",
     )
     fun findUnpaidInHousehold(@Param("householdId") householdId: Long): List<ExpenseShare>
+
+    // Settling returns the updated share to the client, so its user must be loaded
+    // before the transaction closes. The household comes along for the membership
+    // check that authorises the settle.
+    @Query(
+        "select s from ExpenseShare s " +
+            "join fetch s.user " +
+            "join fetch s.expense e " +
+            "join fetch e.household " +
+            "where s.id = :id",
+    )
+    fun findByIdWithDetails(@Param("id") id: Long): ExpenseShare?
 }
