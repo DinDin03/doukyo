@@ -7,17 +7,20 @@ import { Avatar } from '../../src/design/widgets';
 import { colors, ink, radius } from '../../src/design/theme';
 import { useAuth } from '../../src/auth/AuthContext';
 import { useHousehold } from '../../src/household/HouseholdContext';
+import { formatCents, useExpenses } from '../../src/expense/useExpenses';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { activeHousehold } = useHousehold();
+  const { balances, expenses } = useExpenses(activeHousehold?.id);
 
   if (!activeHousehold) return null;
 
   const firstName = user?.name?.split(' ')[0] ?? '';
   const members = activeHousehold.members;
   const isAlone = members.length === 1;
+  const myNet = balances.find((b) => b.userId === user?.id)?.netCents ?? 0;
 
   return (
     <View style={styles.root}>
@@ -36,12 +39,23 @@ export default function HomeScreen() {
             <Kicker>Your balance</Kicker>
             <Feather name="chevron-right" size={15} color={ink(0.4)} />
           </View>
-          <Num size={52} weight="light" style={styles.bigMoney}>
-            $0.00
+          <Num
+            size={52}
+            weight="light"
+            color={myNet > 0 ? colors.accentRamp[700] : colors.text}
+            style={styles.bigMoney}
+          >
+            {myNet < 0 ? `−${formatCents(myNet)}` : formatCents(myNet)}
           </Num>
           <Divider style={{ marginVertical: 13 }} />
           <Body size={13} color={ink(0.55)}>
-            No expenses yet. Add one and everyone&apos;s share is worked out for you.
+            {expenses.length === 0
+              ? "No expenses yet. Add one and everyone's share is worked out for you."
+              : myNet === 0
+                ? `All square across ${expenses.length} expense${expenses.length === 1 ? '' : 's'}.`
+                : myNet > 0
+                  ? 'The house owes you this.'
+                  : 'You owe the house this.'}
           </Body>
         </Card>
 

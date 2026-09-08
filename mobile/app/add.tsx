@@ -1,56 +1,76 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader } from '../src/design/AppHeader';
 import { Body, Button, Divider, Field, Kicker, Num, Screen } from '../src/design/ui';
-import { Chip, Segmented, Stepper } from '../src/design/widgets';
+import { Checkbox, Chip, Segmented, Stepper } from '../src/design/widgets';
 import { colors, ink, radius } from '../src/design/theme';
+import { useAuth } from '../src/auth/AuthContext';
+import { useHousehold } from '../src/household/HouseholdContext';
+import { ExpenseCategory, formatCents, SplitMethod, useExpenses } from '../src/expense/useExpenses';
 
-type Mode = 'even' | 'exact' | 'percent' | 'shares';
-const MEMBERS = [
-  { id: 'you', name: 'You' },
-  { id: 'sam', name: 'Sam' },
-  { id: 'jules', name: 'Jules' },
-  { id: 'ravi', name: 'Ravi' },
-];
-const CATEGORIES = ['Groceries', 'Bills', 'Dining', 'Household', 'Other'];
+const CATEGORIES: ExpenseCategory[] = ['GROCERIES', 'BILLS', 'DINING', 'HOUSEHOLD', 'OTHER'];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
-const fmt = (cents: number) => '$' + (cents / 100).toFixed(2);
+const title = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
-function split(cents: number, mode: Mode, units: Record<string, number>) {
-  const ids = MEMBERS.map((m) => m.id);
-  if (mode === 'shares') {
-    const total = ids.reduce((s, id) => s + units[id], 0) || 1;
-    const alloc = ids.map((id) => Math.floor((cents * units[id]) / total));
-    let rem = cents - alloc.reduce((a, b) => a + b, 0);
-    for (let i = 0; rem > 0; i++, rem--) alloc[i % ids.length]++;
-    return Object.fromEntries(ids.map((id, i) => [id, alloc[i]]));
-  }
-  const base = Math.floor(cents / ids.length);
-  const rem = cents - base * ids.length;
-  return Object.fromEntries(ids.map((id, i) => [id, base + (i < rem ? 1 : 0)]));
+function errorMessage(e: unknown): string {
+  const err = e as { errors?: { message: string }[]; graphQLErrors?: { message: string }[]; message?: string };
+  return err?.errors?.[0]?.message ?? err?.graphQLErrors?.[0]?.message ?? err?.message ?? 'Could not save the expense';
 }
 
 export default function AddExpenseScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { activeHousehold } = useHousehold();
+  const { createExpense } = useExpenses(activeHousehold?.id);
+
+  const members = activeHousehold?.members ?? [];
   const [cents, setCents] = useState(0);
-  const [desc, setDesc] = useState('');
-  const [cat, setCat] = useState('Groceries');
-  const [payer, setPayer] = useState('you');
-  const [mode, setMode] = useState<Mode>('even');
-  const [units, setUnits] = useState<Record<string, number>>({ you: 1, sam: 1, jules: 1, ravi: 1 });
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<ExpenseCategory>('GROCERIES');
+  const [paidByIdState, setPaidByIdState] = useState('');
+  const paidById = paidByIdState || user?.id || members[0]?.id || '';
+  const setPaidById = setPaidByIdState;
+  const [method, setMethod] = useState<Extract<SplitMethod, 'EVENLY' | 'WEIGHTS'>>('EVENLY');
+  // Absent means default (included, weight 1). Seeding these from `members` would
+  // break whenever the household loads after the first render.
+  const [included, setIncluded] = useState<Record<string, boolean>>({});
+  const [weights, setWeights] = useState<Record<string, number>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!activeHousehold) return null;
+
+  const participants = members.filter((m) => included[m.id] ?? true);
+  const canSave = cents > 0 && description.trim().length > 0 && participants.length > 0 && !!paidById && !busy;
 
   const press = (k: string) => {
     if (k === 'del') setCents((c) => Math.floor(c / 10));
-    else if (k === '.') return;
-    else setCents((c) => Math.min(c * 10 + Number(k), 99_999_999));
+    else if (k !== '.') setCents((c) => Math.min(c * 10 + Number(k), 99_999_999));
   };
-  const bump = (id: string, d: number) => setUnits((u) => ({ ...u, [id]: Math.max(0, u[id] + d) }));
 
-  const amounts = split(cents, mode, units);
-  const assigned = Object.values(amounts).reduce((a, b) => a + b, 0);
-  const remaining = cents - assigned;
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await createExpense({
+        paidById,
+        description: description.trim(),
+        amountCents: cents,
+        category,
+        method,
+        participants: participants.map((m) => ({
+          userId: m.id,
+          ...(method === 'WEIGHTS' ? { value: weights[m.id] ?? 1 } : {}),
+        })),
+      });
+      router.back();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -58,110 +78,103 @@ export default function AddExpenseScreen() {
       <Screen>
         <View style={styles.card}>
           <Kicker color={ink(0.5)}>Amount</Kicker>
-          <Num size={46} weight="light" color={cents ? colors.text : ink(0.35)} style={{ marginTop: 4 }}>
-            {fmt(cents)}
+          <Num size={46} weight="light" style={{ marginTop: 4, letterSpacing: -1 }}>
+            {formatCents(cents)}
           </Num>
-          <Divider style={{ marginVertical: 13 }} />
-          <Field label="What was it for" value={desc} onChangeText={setDesc} placeholder="Groceries, internet, wine…" />
-          <View style={styles.chips}>
-            {CATEGORIES.map((c) => (
-              <Chip key={c} label={c} active={c === cat} onPress={() => setCat(c)} />
-            ))}
-          </View>
         </View>
 
-        <Kicker color={ink(0.45)} style={styles.section}>
-          Paid by
-        </Kicker>
-        <View style={styles.payerRow}>
-          {MEMBERS.map((m) => {
-            const active = m.id === payer;
-            return (
-              <Pressable
-                key={m.id}
-                onPress={() => setPayer(m.id)}
-                style={[styles.payer, { borderColor: active ? colors.accent : colors.divider }]}
-              >
-                <Body size={13.5} color={active ? colors.accent : ink(0.65)} style={styles.payerLabel}>
-                  {m.name}
-                </Body>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Kicker color={ink(0.45)} style={styles.section}>
-          Split
-        </Kicker>
-        <Segmented
-          options={[
-            { value: 'even', label: 'Even' },
-            { value: 'exact', label: 'Exact' },
-            { value: 'percent', label: '%' },
-            { value: 'shares', label: 'Shares' },
-          ]}
-          value={mode}
-          onChange={setMode}
-        />
-
-        <View style={[styles.card, { marginTop: 12, paddingVertical: 4 }]}>
-          {MEMBERS.map((m, i) => (
-            <View key={m.id} style={[styles.splitRow, i === MEMBERS.length - 1 && styles.noBorder]}>
-              <View style={{ flex: 1 }}>
-                <Body size={14}>{m.name}</Body>
-                <Body size={11} color={ink(0.5)} style={{ marginTop: 1 }}>
-                  {mode === 'shares' ? `${units[m.id]} share${units[m.id] === 1 ? '' : 's'}` : mode === 'percent' ? '25%' : 'Even split'}
-                </Body>
-              </View>
-              {mode === 'shares' ? (
-                <Stepper value={units[m.id]} onDec={() => bump(m.id, -1)} onInc={() => bump(m.id, 1)} />
-              ) : null}
-              <Num size={16} style={styles.splitAmount}>
-                {fmt(amounts[m.id])}
-              </Num>
-            </View>
-          ))}
-          <View style={styles.remainRow}>
-            <Kicker color={remaining === 0 ? ink(0.45) : colors.accentRamp[700]}>
-              {remaining === 0 ? 'Splits in full' : 'Remaining'}
-            </Kicker>
-            <Num size={13} color={remaining === 0 ? ink(0.45) : colors.accentRamp[700]}>
-              {fmt(remaining)}
-            </Num>
-          </View>
-        </View>
-
-        <View style={styles.dashedRow}>
-          <View style={styles.dashed}>
-            <Feather name="camera" size={16} color={ink(0.6)} />
-            <Body size={12.5} color={ink(0.6)}>
-              Receipt photo
-            </Body>
-          </View>
-          <View style={styles.dashed}>
-            <Feather name="repeat" size={16} color={ink(0.6)} />
-            <Body size={12.5} color={ink(0.6)}>
-              Repeats monthly
-            </Body>
-          </View>
-        </View>
-
-        <Kicker color={ink(0.45)} style={styles.section}>
-          Enter amount
-        </Kicker>
         <View style={styles.pad}>
           {KEYS.map((k) => (
-            <Pressable key={k} onPress={() => press(k)} style={styles.key}>
-              {k === 'del' ? (
-                <Feather name="delete" size={19} color={colors.text} />
-              ) : (
-                <Num size={21}>{k}</Num>
-              )}
+            <Pressable key={k} onPress={() => press(k)} style={styles.key} disabled={k === '.'}>
+              <Num size={22} color={k === '.' ? ink(0.25) : colors.text}>
+                {k === 'del' ? '⌫' : k}
+              </Num>
             </Pressable>
           ))}
         </View>
 
-        <Button label="Save expense" block onPress={() => router.back()} style={{ marginTop: 18 }} />
+        <Field label="Description" value={description} onChangeText={setDescription} placeholder="Groceries" />
+
+        <Kicker color={ink(0.5)} style={styles.label}>
+          Category
+        </Kicker>
+        <View style={styles.chips}>
+          {CATEGORIES.map((c) => (
+            <Chip key={c} label={title(c)} active={c === category} onPress={() => setCategory(c)} />
+          ))}
+        </View>
+
+        <Kicker color={ink(0.5)} style={styles.label}>
+          Paid by
+        </Kicker>
+        <View style={styles.chips}>
+          {members.map((m) => (
+            <Chip
+              key={m.id}
+              label={m.id === user?.id ? 'You' : m.name}
+              active={m.id === paidById}
+              onPress={() => setPaidById(m.id)}
+            />
+          ))}
+        </View>
+
+        <Divider style={{ marginVertical: 18 }} />
+
+        <Segmented
+          options={[
+            { value: 'EVENLY', label: 'Split evenly' },
+            { value: 'WEIGHTS', label: 'By shares' },
+          ]}
+          value={method}
+          onChange={setMethod}
+        />
+
+        <Kicker color={ink(0.5)} style={styles.label}>
+          Who&apos;s sharing
+        </Kicker>
+        {members.map((m) => (
+          <View key={m.id} style={styles.memberRow}>
+            <Checkbox
+              done={included[m.id] ?? true}
+              onPress={() => setIncluded((s) => ({ ...s, [m.id]: !(s[m.id] ?? true) }))}
+            />
+            <Body size={14.5} style={{ flex: 1 }}>
+              {m.id === user?.id ? `${m.name} (you)` : m.name}
+            </Body>
+            {method === 'WEIGHTS' && (included[m.id] ?? true) ? (
+              <Stepper
+                value={<Num size={14}>{weights[m.id] ?? 1}</Num>}
+                onDec={() => setWeights((w) => ({ ...w, [m.id]: Math.max(1, (w[m.id] ?? 1) - 1) }))}
+                onInc={() => setWeights((w) => ({ ...w, [m.id]: (w[m.id] ?? 1) + 1 }))}
+              />
+            ) : null}
+          </View>
+        ))}
+
+        {/* Approximate on purpose. The server runs the largest-remainder split and
+            is the only authority on the cent — duplicating that maths here would
+            eventually disagree with it. */}
+        {cents > 0 && participants.length > 0 && method === 'EVENLY' ? (
+          <Body size={12} color={ink(0.5)} style={{ marginTop: 10 }}>
+            ≈ {formatCents(Math.floor(cents / participants.length))} each · exact shares are
+            worked out when you save
+          </Body>
+        ) : null}
+
+        {error ? (
+          <Body size={13} color={colors.accentRamp[700]} style={{ marginTop: 14 }}>
+            {error}
+          </Body>
+        ) : null}
+
+        <Button
+          label={busy ? 'Saving…' : 'Save expense'}
+          block
+          disabled={!canSave}
+          onPress={submit}
+          style={{ marginTop: 20 }}
+        />
+        {busy ? <ActivityIndicator color={colors.accent} style={{ marginTop: 10 }} /> : null}
       </Screen>
     </View>
   );
@@ -169,44 +182,23 @@ export default function AddExpenseScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  card: { borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: 16 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
-  section: { marginTop: 22, marginBottom: 8 },
-  payerRow: { flexDirection: 'row', gap: 8 },
-  payer: { flex: 1, alignItems: 'center', paddingVertical: 10, borderWidth: 1, borderRadius: radius.md },
-  payerLabel: { fontFamily: undefined },
-  splitRow: {
+  card: {
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: radius.md,
+    padding: 16,
+    alignItems: 'center',
+  },
+  pad: { flexDirection: 'row', flexWrap: 'wrap', marginVertical: 14 },
+  key: { width: '33.33%', alignItems: 'center', paddingVertical: 13 },
+  label: { marginTop: 18, marginBottom: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
+    gap: 12,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
-  },
-  noBorder: { borderBottomWidth: 0 },
-  splitAmount: { minWidth: 74, textAlign: 'right' },
-  remainRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingVertical: 11 },
-  dashedRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  dashed: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    borderStyle: 'dashed',
-    borderRadius: radius.md,
-  },
-  pad: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  key: {
-    width: '31.5%',
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: radius.md,
   },
 });
