@@ -10,6 +10,16 @@
 
 ---
 
+## Where we are (2026-09-14)
+
+- **Done:** Expo Router shell, design system, real sign-in (email code + Google), create/join/leave/restore
+  a household, expenses (list, add, balances, settle), live household chat with unread badges.
+- **Sample data only:** Chores, Shopping, Meals and Activity screens are designed but not wired to an API.
+- **Next:** expense detail/edit/delete, then a component-test setup (the routing gate has regressed
+  three times with nothing to catch it).
+
+---
+
 ## The sequencing decision: interleave, not frontend-last
 
 Frontend is built **feature-by-feature, right after each backend slice** — not all at the
@@ -66,26 +76,27 @@ These aren't milestones; they're disciplines that begin at M0 and improve every 
 
 ---
 
-## M0 — Frontend foundation ⬜  *(build once, now)*
+## M0 — Frontend foundation ✅  *(build once, now)*
 
 *The shared skeleton every feature screen plugs into. The only "big" frontend setup.*
 
 **Depends on:** nothing new (Apollo already wired in Phase 0a mobile).
 
 **Build:**
-- ⬜ **Navigation** — add **Expo Router** (file-based routing). Establish the shell:
+- ✅ **Navigation** — add **Expo Router** (file-based routing). Establish the shell:
   a **bottom tab bar** (Home · Expenses · Chores · Shopping · Meals · More) with a
-  **stack** inside each tab for drill-down. Stub every screen.
-- ⬜ **GraphQL Codegen** — wire `@graphql-codegen` to the backend schema; generate typed
+  **stack** inside each tab for drill-down. Stub every screen. (Shipped with Chat as a
+  seventh tab, which is cramped; worth revisiting.)
+- ⬜ **GraphQL Codegen** (still hand-typed) — wire `@graphql-codegen` to the backend schema; generate typed
   query/mutation hooks. Replace the hand-typed `useQuery<{...}>` with generated types.
-- ⬜ **Design system v0** — theme tokens (light/dark), and base components: `Screen`,
+- ✅ **Design system v0** (light only; dark mode ⬜) — theme tokens (light/dark), and base components: `Screen`,
   `AppText`, `Button`, `TextInput`, `Card`, `ListItem`, `Loading`, `ErrorView`,
   `EmptyState`.
-- ⬜ **Current-user stand-in (fake auth)** — a `CurrentUserProvider` (React context) that
+- ✅ ~~**Current-user stand-in (fake auth)**~~ Superseded: real auth was built instead (`AuthContext`, secure-store tokens) — a `CurrentUserProvider` (React context) that
   holds the selected user, persisted with `AsyncStorage`. A "pick or create a user" gate
   before the tabs. **Records ADR-007: defer real auth; fake current-user via local
   selection.**
-- ⬜ **API config** — keep the LAN-IP-from-Metro trick; add an env layer so a real
+- 🔨 **API config** (LAN IP from Metro ✅, env layer ⬜) — keep the LAN-IP-from-Metro trick; add an env layer so a real
   backend URL can be swapped in later (for device/EAS builds).
 
 **Concepts:** file-based navigation, tab + stack composition, React context + providers,
@@ -96,18 +107,18 @@ and every tab shows a (stub) screen — all typed and themed.
 
 ---
 
-## M1 — Households & accounts ⬜
+## M1 — Households & accounts 🔨
 
 *The first real domain UI. Wires the API you just built (Milestone 1a).*
 
 **Depends on:** backend Users/Households/Membership (✅ done).
 
 **Screens & features:**
-- ⬜ **Pick/Create User** (the fake login from M0, fleshed out): list users, create one.
-- ⬜ **Households list** — the current user's households; create a household.
-- ⬜ **Household detail** — name, members list, **add member** (pick a user).
-- ⬜ **Leave / remove member** (once backend supports it).
-- ⬜ Switch active household (a household picker in the header).
+- ✅ ~~**Pick/Create User**~~ Replaced by sign-in / sign-up (emailed code) / Google.
+- ✅ **Households** — create a household or join one by code (choose → create / join).
+- ✅ **Household detail** (More tab) — name, members, invite code. Members join by code rather than being picked.
+- 🔨 **Leave / remove member** — leave ✅ (with last-member delete prompt and restore); remove ⬜.
+- ⬜ Switch active household (the More tab row exists but does nothing yet).
 
 **Concepts:** `useQuery` lists with `FlatList`, controlled **forms** + `TextInput`,
 **mutations** (`createUser`/`createHousehold`/`addMember`), **cache updates after a
@@ -119,19 +130,19 @@ update live — no terminal, no GraphiQL.
 
 ---
 
-## M2 — Expenses ⬜  *(the big one)*
+## M2 — Expenses 🔨  *(the big one)*
 
 *The richest UI in the app, matching the richest backend domain.*
 
 **Depends on:** backend Expenses (add/split/balances/settle).
 
 **Screens & features:**
-- ⬜ **Expenses list** — per household, grouped by date; amount, payer, description.
-- ⬜ **Add expense** — amount input, payer, description, category, date; **split selector**
+- ✅ **Expenses list** — per household, grouped by date; amount, payer, description.
+- 🔨 **Add expense** (even and weights in the UI; exact and % are backend-only so far) — amount input, payer, description, category, date; **split selector**
   (even / exact / % / shares) with a **live split preview** that updates as you type.
-- ⬜ **Balances** — "who owes whom," the simplified settle-up view.
-- ⬜ **Settle up** — record a payment; balances recompute.
-- ⬜ **Expense detail / edit / delete** — with balances updating.
+- 🔨 **Balances** — net positions ✅, owed-to-you / you-owe ✅; the simplified settle-up plan ⬜.
+- ✅ **Settle up** — the person owed marks it paid; balances recompute.
+- 🔨 **Expense detail / edit / delete** — with balances updating.
 - ⬜ **Receipt photo** — image picker + upload (file handling on mobile).
 - ⬜ Recurring expense setup.
 
@@ -145,7 +156,7 @@ feature the house feels most.
 
 ---
 
-## M3 — Chores ⬜
+## M3 — Chores ⬜  *(screen designed with sample data; no API yet)*
 
 **Depends on:** backend Chores (rotation, assignments, fairness).
 
@@ -164,7 +175,7 @@ ones nudge you.
 
 ---
 
-## M4 — Shopping list ⬜
+## M4 — Shopping list ⬜  *(screen designed with sample data; no API yet)*
 
 **Depends on:** backend Shopping list (+ the expense link).
 
@@ -184,7 +195,7 @@ expense in a couple taps.
 
 ---
 
-## M5 — Meals & recipes ⬜
+## M5 — Meals & recipes ⬜  *(screen designed with sample data; no API yet)*
 
 **Depends on:** backend Meals/Recipes (+ plan → shopping-list generation).
 
@@ -231,11 +242,11 @@ one round trip for a multi-domain screen), card layouts, and the first place **c
 **Screens & features:**
 - ⬜ **Activity feed** — cross-domain events (expense added, chore done, item bought), with
   **pagination / infinite scroll**.
-- ⬜ **Real-time updates** — **GraphQL subscriptions** (WebSocket) so lists update live
+- 🔨 **Real-time updates** (✅ for chat) — **GraphQL subscriptions** (WebSocket) so lists update live
   without polling; replace M4's polling.
 - ⬜ **Push notifications** — Expo Notifications; device token registration; deep links
   into the relevant screen.
-- ⬜ Unread badges.
+- ✅ Unread badges (chat).
 
 **Concepts:** **GraphQL subscriptions** over WebSocket, cursor **pagination**, **push
 notifications** end-to-end (permissions, tokens, handling taps), **deep linking**.
@@ -271,7 +282,7 @@ approved action.
 
 *Quality passes. Some (optimistic UI, states) happen inline earlier; the rest here.*
 
-- ⬜ **Optimistic updates** everywhere they improve feel (check a box → instant).
+- 🔨 **Optimistic updates** (chat sends, sign-up code screen) everywhere they improve feel (check a box → instant).
 - ⬜ **Offline support** — Apollo cache persistence + a mutation queue that syncs on
   reconnect. **[learning]**
 - ⬜ **Skeletons & animations** (Reanimated), **haptics**, refined dark mode.
@@ -291,7 +302,7 @@ is usable by everyone.
 *Getting it onto flatmates' actual phones.*
 
 - ⬜ **App identity** — real icon, splash, name, bundle IDs.
-- ⬜ **EAS Build** — cloud builds for iOS + Android (moves beyond Expo Go).
+- 🔨 **EAS Build** (a dev-client build is in use, needed for native Google sign-in) — cloud builds for iOS + Android (moves beyond Expo Go).
 - ⬜ **EAS Update** — over-the-air JS updates (ship fixes without a store round-trip).
 - ⬜ **Distribution** — internal (TestFlight / an APK link) for the house; store submission
   only if you ever want it (non-goal per the design doc).

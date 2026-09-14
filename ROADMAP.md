@@ -10,6 +10,17 @@
 
 ---
 
+## Where we are (2026-09-14)
+
+- **Done:** foundation, auth (JWT + rotating refresh tokens, Google, emailed sign-up codes),
+  households (create, join by code, leave, soft delete + restore), expenses (all four split
+  methods, balances, settle-up confirmed by the payer), household chat over GraphQL subscriptions.
+- **Next:** edit/delete an expense with an activity log, then debt simplification, which closes Milestone 1.
+- **Pulled forward from later milestones:** real auth (was deferred) and real-time chat via
+  WebSocket subscriptions (was Milestone 5/7). Both were built early because the app needed them.
+
+---
+
 ## How to read this
 
 Each milestone has four parts:
@@ -23,7 +34,7 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 
 ---
 
-## Phase 0 — Project foundation 🔨
+## Phase 0 — Project foundation ✅
 
 *Before any domain work. This is the "ceremony" ADR-001 accepts as the cost of learning the real stack.*
 
@@ -35,9 +46,9 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 - ✅ **GraphQL API chosen** (Spring for GraphQL) with a working `ping` query + slice test.
 - ✅ `.gitignore` (excludes `.idea/`, `build/`, `node_modules/`, env files).
 - ✅ Database wired: Postgres 16 (Docker, host port **5433** to avoid a Homebrew Postgres on 5432) + Spring Data JPA (`ddl-auto: validate`) + **Flyway**; `V1__init.sql` creates `users`/`households`/`memberships`.
-- ⬜ Spring profiles: `local` (Docker Postgres), `test` (Testcontainers). *(0b)*
-- 🔨 Package structure reflecting the modular monolith: `household`, `expense`, `chore`, `shopping`, `meal`, `common` (only `health` exists so far).
-- 🔨 Baseline test setup: JUnit 5 ✅, `GraphQlTester` ✅, Testcontainers for real Postgres ⬜ *(0b)*.
+- ⬜ Spring profiles: `local` / `test`. Not needed yet: tests point at a separate `doukyo_test` database instead.
+- 🔨 Package structure reflecting the modular monolith: `auth`, `user`, `household`, `expense`, `chat`, `common` exist; `chore`, `shopping`, `meal` arrive with their milestones.
+- ✅ Baseline test setup: JUnit 5, `GraphQlTester`, integration tests against real Postgres. Testcontainers is blocked (Docker Engine 29 rejects its API probe), so tests use the Compose Postgres with a dedicated test database.
 - ✅ `mobile/` Expo (SDK 54) + React Native + TypeScript app with Apollo Client calling `ping`/`greeting` live.
 
 ### Concepts learned
@@ -52,30 +63,31 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 
 ---
 
-## Milestone 1 — Foundation + Expenses (v1) ⬜  *← current focus*
+## Milestone 1 — Foundation + Expenses (v1) 🔨  *← current focus*
 
 *The richest self-contained domain and the one flatmates feel most. Build the whole vertical slice.*
 
 ### 1a. Households & accounts
 
 **User-facing features**
-- ⬜ Create a user profile (name, email). *Done when:* a user can be created and fetched.
-- ⬜ Create a household. *Done when:* a household exists with a creator as its first member.
-- ⬜ Invite flatmates by link/code; join a household via that code. *Done when:* a second user joins and both appear as members.
-- ⬜ Leave a household. *Done when:* membership is removed and the user no longer sees household data.
-- ⬜ A user may belong to multiple households; switching context returns only that household's data. *Done when:* data is correctly scoped per household (tenant isolation).
-- ⬜ Remove a member and handle leftover data (outstanding debts, assigned chores) — for now: block removal if debts are unsettled, or reassign. *Done when:* removing a member with open shares is handled explicitly, not silently.
+- ✅ Create an account: email + password (verified by an emailed one-time code) or Google. *Done when:* a user can be created and fetched.
+- ✅ Create a household. *Done when:* a household exists with a creator as its first member.
+- ✅ Invite flatmates by code (a shareable link is still ⬜); join a household via that code. *Done when:* a second user joins and both appear as members.
+- ✅ Leave a household. *Done when:* membership is removed and the user no longer sees household data. Blocked while you have unpaid debts with anyone; the invite code rotates; the last member soft deletes the household and can restore it for 30 days.
+- 🔨 A user may belong to multiple households (backend ✅, app switcher ⬜); switching context returns only that household's data. *Done when:* data is correctly scoped per household (tenant isolation).
+- ⬜ Remove a member (designed as a majority vote; deferred) and handle leftover data (outstanding debts, assigned chores) — for now: block removal if debts are unsettled, or reassign. *Done when:* removing a member with open shares is handled explicitly, not silently.
 
 **Data model** (*Designed* in doc §6.1)
 - `User(id, name, email)`
-- `Household(id, name, created_at)`
+- `Household(id, name, invite_code, created_at, deleted_at, deleted_by)`
 - `Membership(id, user_id → User, household_id → Household, joined_at)` — the many-to-many join table.
 
 **Engineering / infra**
-- ⬜ CRUD endpoints for user, household, membership.
-- ⬜ Invite-code generation + join flow.
-- ⬜ Tenant scoping: every household-owned query filtered by `household_id` (foundation for multi-tenancy).
-- ⬜ Migrations for the three tables.
+- ✅ GraphQL operations for accounts, households, membership.
+- ✅ Invite-code generation + join flow.
+- ✅ Tenant scoping: every household-owned read goes through one membership check.
+- ✅ Migrations for the three tables.
+- ✅ Membership changes lock the household row (no orphaned households, no joins into a deleting one).
 
 **Concepts learned**
 - Many-to-many via a join table; tenant isolation ("every row belongs to a household").
@@ -85,18 +97,18 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 ### 1b. Expenses & splitting
 
 **User-facing features**
-- ⬜ Add an expense (payer, amount, description, date, category). *Done when:* an expense + its shares persist and sum correctly.
-- ⬜ Split **evenly**. *Done when:* N shares each = amount/N, remainder handled (no lost cents).
-- ⬜ Split by **exact amounts**. *Done when:* shares must sum to the total or the request is rejected.
-- ⬜ Split by **percentage**. *Done when:* percentages sum to 100 and convert to cent-exact amounts.
-- ⬜ Split by **shares/weights**. *Done when:* weighted split distributes cents exactly.
-- ⬜ View per-person balances (who owes whom). *Done when:* a net balance per member is computed from unpaid shares.
-- ⬜ Settle up / record a payment. *Done when:* settling flips share(s) `is_paid = true` and balances update.
+- ✅ Add an expense (payer, amount, description, category; the date is when it was entered). *Done when:* an expense + its shares persist and sum correctly.
+- ✅ Split **evenly**. *Done when:* N shares each = amount/N, remainder handled (no lost cents).
+- ✅ Split by **exact amounts**. *Done when:* shares must sum to the total or the request is rejected.
+- ✅ Split by **percentage** (basis points, so 33.33% is exact). *Done when:* percentages sum to 100 and convert to cent-exact amounts.
+- ✅ Split by **shares/weights**. *Done when:* weighted split distributes cents exactly.
+- ✅ View per-person balances (who owes whom). *Done when:* a net balance per member is computed from unpaid shares.
+- ✅ Settle up / record a payment. *Done when:* settling flips share(s) `is_paid = true` and balances update. Only the payer can confirm it.
 - ⬜ Simplify debts to the fewest transactions **[learning]** *(nice for users, but the real reason is the graph/greedy algorithm exercise)*. *Done when:* a settle-up plan minimizes transaction count for a known example.
 - ⬜ Recurring expenses (e.g. rent). *Done when:* a recurring rule generates expenses on schedule.
 - ⬜ Attach a receipt photo. *Done when:* an image is stored (local/object storage) and linked to the expense.
-- ⬜ Edit/delete an expense with balances recomputing. *Done when:* editing amount/split recomputes shares atomically.
-- ⬜ Activity log of expense changes. *Done when:* create/edit/delete/settle are recorded and queryable.
+- 🔨 Edit/delete an expense with balances recomputing. *Done when:* editing amount/split recomputes shares atomically.
+- 🔨 Activity log of expense changes. *Done when:* create/edit/delete/settle are recorded and queryable.
 
 **Data model** (*Designed* in doc §6.2)
 - `Expense(id, household_id, amount, paid_by → User, description, category, created_at)`
@@ -105,10 +117,10 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 - Later: `RecurringExpense` rule; `Receipt` (or a URL column); `ExpenseActivity` log.
 
 **Engineering / infra**
-- ⬜ Money handling: store integer cents (never floats); a single split-calculation service with the remainder-distribution rule.
-- ⬜ Transactional writes: expense + all shares committed atomically.
-- ⬜ Validation: shares sum to total; percentages sum to 100; payer is a household member.
-- ⬜ Balance query: aggregate unpaid shares into net per-person positions.
+- ✅ Money handling: store integer cents (never floats); a single split-calculation service with the remainder-distribution rule (largest remainder).
+- ✅ Transactional writes: expense + all shares committed atomically.
+- ✅ Validation: shares sum to total; percentages sum to 100; payer is a household member.
+- ✅ Balance query: aggregate unpaid shares into net per-person positions.
 - ⬜ Debt-simplification algorithm (greedy min-cash-flow) with unit tests on worked examples.
 
 **Concepts learned**
@@ -199,7 +211,7 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 **Engineering / infra**
 - ⬜ Every domain action emits a domain event.
 - ⬜ Kafka in Docker Compose; producers in each module; consumers for feed + notifications.
-- ⬜ Outbox pattern so events and DB writes stay consistent.
+- ⬜ Outbox pattern so events and DB writes stay consistent. (A lighter version exists: chat and emails publish only after the transaction commits.)
 
 **Concepts learned**
 - Event-driven architecture, producers/consumers, topics, ordering.
@@ -212,7 +224,7 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 
 **Engineering / infra**
 - ⬜ **Redis** cache-aside for the dashboard and hot list reads; invalidation on writes.
-- ⬜ **Resilience:** rate limiting, retries with backoff, circuit breakers, graceful degradation.
+- ⬜ **Resilience:** rate limiting (sign-in and sign-up have none yet; the code check has an attempt limit + lockout), retries with backoff, circuit breakers, graceful degradation.
 - ⬜ **Observability:** structured logging, metrics, distributed tracing; latency percentiles.
 - ⬜ The **forward-decay reservoir** for recent-weighted p99 latency (doc §8: "store the birth date, not the age").
 
@@ -275,7 +287,7 @@ A milestone is **done** only when its slice is usable end-to-end (API + persiste
 
 These aren't a milestone of their own; they land incrementally as the domains they tie together come online.
 
-- ⬜ **Dashboard** — balances + chores + tonight's dinner + shopping list in one view. First useful after Milestone 1; grows each milestone. (Prime Redis cache target in Milestone 6.)
+- 🔨 **Dashboard** (Home shows your real balance; the other cards are still sample data) — balances + chores + tonight's dinner + shopping list in one view. First useful after Milestone 1; grows each milestone. (Prime Redis cache target in Milestone 6.)
 - ⬜ **Activity feed** across domains — stub in each milestone, unified properly in Milestone 5 (Kafka).
 - ⬜ **Notifications** — in-app surfacing early; real push in Milestone 5.
 - ⬜ **Search** across expenses/chores/items/recipes — added once there's enough data to search.
