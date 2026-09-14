@@ -82,6 +82,7 @@ type Mutation {
         participants: [ParticipantInput!]!
     ): Expense!
     # Marks one person's share of one expense as paid. Never deletes it.
+    # Only whoever paid the expense can do this — they know if the money arrived.
     settleShare(shareId: ID!): ExpenseShare!
 }
 

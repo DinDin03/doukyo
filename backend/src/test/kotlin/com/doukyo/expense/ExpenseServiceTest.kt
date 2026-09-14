@@ -347,7 +347,7 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
         )
         val bobsShare = sharesOf(expense.id!!).first { it.user.id == bob.userId() }
 
-        expenseService.settleShare(bobsShare.id!!, bob.userId())
+        expenseService.settleShare(bobsShare.id!!, alice.userId())
 
         val balances = expenseService.balances(hid, alice.userId()).associate { it.userId to it.netCents }
         assertThat(balances[alice.userId()]).isZero()
@@ -359,7 +359,7 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
         val expense = addExpense()
         val share = sharesOf(expense.id!!).first { it.user.id == bob.userId() }
 
-        expenseService.settleShare(share.id!!, bob.userId())
+        expenseService.settleShare(share.id!!, alice.userId())
 
         assertThat(sharesOf(expense.id!!)).hasSize(3)
         assertThat(sharesOf(expense.id!!).first { it.user.id == bob.userId() }.isPaid).isTrue()
@@ -370,10 +370,25 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
         val expense = addExpense()
         val share = sharesOf(expense.id!!).first { it.user.id == bob.userId() }
 
-        expenseService.settleShare(share.id!!, bob.userId())
-        expenseService.settleShare(share.id!!, bob.userId())
+        expenseService.settleShare(share.id!!, alice.userId())
+        expenseService.settleShare(share.id!!, alice.userId())
 
         assertThat(sharesOf(expense.id!!).first { it.user.id == bob.userId() }.isPaid).isTrue()
+    }
+
+    @Test
+    fun `only the person who is owed can mark a debt paid`() {
+        // Bob owes Alice. If Bob, or a bystander like Carol, could settle it,
+        // Alice's money would disappear from the ledger without her knowing.
+        val expense = addExpense()
+        val bobsShare = sharesOf(expense.id!!).first { it.user.id == bob.userId() }
+
+        listOf(bob, carol).forEach { notOwed ->
+            assertThatThrownBy { expenseService.settleShare(bobsShare.id!!, notOwed.userId()) }
+                .isInstanceOf(ForbiddenException::class.java)
+                .hasMessage("Only the person who paid can mark this as settled")
+        }
+        assertThat(sharesOf(expense.id!!).first { it.user.id == bob.userId() }.isPaid).isFalse()
     }
 
     @Test

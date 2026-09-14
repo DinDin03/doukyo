@@ -127,11 +127,17 @@ class ExpenseService(
 
     // Settling flips a flag; it never deletes the row. Deleting would break the
     // sum invariant and lose the record of who paid what.
+    //
+    // Only the payer can settle: they're the one who knows whether the money
+    // arrived. If the person who owes could, "settled" would mean "claimed to pay".
     @Transactional
     fun settleShare(shareId: Long, callerId: Long): ExpenseShare {
         val share = expenseShareRepository.findByIdWithDetails(shareId)
             ?: throw IllegalArgumentException("No share with id $shareId")
         requireMember(share.expense.household.id!!, callerId)
+        if (share.expense.paidBy.id != callerId) {
+            throw ForbiddenException("Only the person who paid can mark this as settled")
+        }
         share.isPaid = true
         return share
     }

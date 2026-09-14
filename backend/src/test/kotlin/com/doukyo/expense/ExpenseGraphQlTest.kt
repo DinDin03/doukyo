@@ -125,7 +125,7 @@ class ExpenseGraphQlTest : AbstractIntegrationTest() {
             .path("expenses[0].shares").entityList(Map::class.java).get()
             .first { it["isPaid"] == false }["id"]
 
-        signedInAs(bob)
+        // Alice paid, so she is the one who confirms Bob paid her back.
         graphQlTester
             .document("mutation { settleShare(shareId: $shareId) { isPaid user { name } } }")
             .execute()
