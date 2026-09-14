@@ -28,12 +28,34 @@ const JOIN_HOUSEHOLD = gql`
   }
 `;
 
+const LEAVE_HOUSEHOLD = gql`
+  mutation LeaveHousehold($householdId: ID!, $confirmDelete: Boolean!) {
+    leaveHousehold(householdId: $householdId, confirmDelete: $confirmDelete)
+  }
+`;
+const RESTORABLE_HOUSEHOLDS = gql`
+  query RestorableHouseholds {
+    restorableHouseholds { id name }
+  }
+`;
+const RESTORE_HOUSEHOLD = gql`
+  mutation RestoreHousehold($householdId: ID!) {
+    restoreHousehold(householdId: $householdId) { id }
+  }
+`;
+
+export type RestorableHousehold = { id: string; name: string };
+
 type HouseholdContextValue = {
   households: HouseholdSummary[];
   activeHousehold: HouseholdSummary | null;
   loading: boolean;
   createHousehold: (name: string) => Promise<void>;
   joinHousehold: (code: string) => Promise<void>;
+  // confirmDelete must be true when you're the last member; the server refuses otherwise.
+  leaveHousehold: (householdId: string, confirmDelete: boolean) => Promise<void>;
+  fetchRestorable: () => Promise<RestorableHousehold[]>;
+  restoreHousehold: (householdId: string) => Promise<void>;
 };
 
 const HouseholdContext = createContext<HouseholdContextValue | undefined>(undefined);
@@ -93,11 +115,47 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     [load],
   );
 
+  const leaveHousehold = useCallback(
+    async (householdId: string, confirmDelete: boolean) => {
+      await apolloClient.mutate({ mutation: LEAVE_HOUSEHOLD, variables: { householdId, confirmDelete } });
+      // Drop everything cached for the household you just left, then let the gate
+      // route on the fresh list.
+      await apolloClient.clearStore();
+      await load();
+    },
+    [load],
+  );
+
+  const fetchRestorable = useCallback(async () => {
+    const { data } = await apolloClient.query<{ restorableHouseholds: RestorableHousehold[] }>({
+      query: RESTORABLE_HOUSEHOLDS,
+      fetchPolicy: 'network-only',
+    });
+    return data?.restorableHouseholds ?? [];
+  }, []);
+
+  const restoreHousehold = useCallback(
+    async (householdId: string) => {
+      await apolloClient.mutate({ mutation: RESTORE_HOUSEHOLD, variables: { householdId } });
+      await load();
+    },
+    [load],
+  );
+
   // No switcher yet (mobile roadmap M1 follow-up) — the first household wins.
   const activeHousehold = households[0] ?? null;
 
   return (
-    <HouseholdContext.Provider value={{ households, activeHousehold, loading, createHousehold, joinHousehold }}>
+    <HouseholdContext.Provider value={{
+        households,
+        activeHousehold,
+        loading,
+        createHousehold,
+        joinHousehold,
+        leaveHousehold,
+        fetchRestorable,
+        restoreHousehold,
+      }}>
       {children}
     </HouseholdContext.Provider>
   );

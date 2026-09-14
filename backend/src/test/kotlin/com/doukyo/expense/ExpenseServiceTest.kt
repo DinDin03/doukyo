@@ -1,7 +1,7 @@
 package com.doukyo.expense
 
 import com.doukyo.AbstractIntegrationTest
-import com.doukyo.common.UnauthorizedException
+import com.doukyo.common.ForbiddenException
 import com.doukyo.household.Household
 import com.doukyo.household.HouseholdService
 import com.doukyo.user.User
@@ -196,7 +196,7 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
     @Test
     fun `a non-member cannot add an expense to the household`() {
         assertThatThrownBy { addExpense(caller = outsider) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
         assertThat(expenseRepository.findAll()).isEmpty()
     }
 
@@ -285,7 +285,7 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
     fun `a non-member cannot list expenses`() {
         addExpense()
         assertThatThrownBy { expenseService.listExpenses(hid, outsider.userId()) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 
     // ---------------------------------------------------------------
@@ -331,7 +331,7 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
     @Test
     fun `a non-member cannot read balances`() {
         assertThatThrownBy { expenseService.balances(hid, outsider.userId()) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 
     // ---------------------------------------------------------------
@@ -382,7 +382,7 @@ class ExpenseServiceTest : AbstractIntegrationTest() {
         val share = sharesOf(expense.id!!).first { it.user.id == bob.userId() }
 
         assertThatThrownBy { expenseService.settleShare(share.id!!, outsider.userId()) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 
     @Test

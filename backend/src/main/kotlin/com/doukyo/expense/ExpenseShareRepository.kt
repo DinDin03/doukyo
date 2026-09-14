@@ -32,4 +32,15 @@ interface ExpenseShareRepository : JpaRepository<ExpenseShare, Long> {
             "where s.id = :id",
     )
     fun findByIdWithDetails(@Param("id") id: Long): ExpenseShare?
+
+    // Any unpaid debt between this user and someone else, in either direction.
+    // Deliberately not "net balance is zero": owing Bob and being owed by Carol
+    // nets to zero while Bob is still out of pocket.
+    @Query(
+        "select count(s) > 0 from ExpenseShare s join s.expense e " +
+            "where e.household.id = :householdId and s.isPaid = false " +
+            "and s.user.id <> e.paidBy.id " +
+            "and (s.user.id = :userId or e.paidBy.id = :userId)",
+    )
+    fun hasOpenDebts(@Param("householdId") householdId: Long, @Param("userId") userId: Long): Boolean
 }

@@ -13,6 +13,8 @@ type Query {
     # --- Households ---
     myHouseholds: [Household!]!        # households the current user belongs to
     household(id: ID!): Household      # one by id — null if it doesn't exist OR you're not a member
+    # Households you deleted by leaving last, still inside the 30-day restore window.
+    restorableHouseholds: [Household!]!
 
     # --- Chat ---
     # Newest first. Omit `before` for the latest page; pass the oldest id you hold
@@ -37,6 +39,12 @@ type Mutation {
     createHousehold(name: String!): Household!
     # Joins the household matching the invite code as the current user.
     joinHousehold(code: String!): Household!
+    # Refused while you have unpaid expenses with anyone. The invite code rotates.
+    # If you're the last member this deletes the household, so it also needs
+    # confirmDelete: true — the server checks, not only the app.
+    leaveHousehold(householdId: ID!, confirmDelete: Boolean = false): Boolean!
+    # Only whoever deleted it, within 30 days. You rejoin as its only member.
+    restoreHousehold(householdId: ID!): Household!
 
     # --- Auth ---
     # Sign-up is two steps. Step one emails a six-digit code and ALWAYS returns

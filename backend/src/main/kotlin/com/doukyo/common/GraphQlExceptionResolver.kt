@@ -35,6 +35,12 @@ class GraphQlExceptionResolver : DataFetcherExceptionResolverAdapter() {
                     .message(ex.message)
                     .build()
 
+            is ForbiddenException ->
+                GraphqlErrorBuilder.newError(env)
+                    .errorType(ErrorType.FORBIDDEN)
+                    .message(ex.message)
+                    .build()
+
             // Not one we recognise -> return null so Spring masks it (INTERNAL_ERROR).
             else -> null
         }

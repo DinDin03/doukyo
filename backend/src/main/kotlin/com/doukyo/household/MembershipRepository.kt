@@ -20,4 +20,8 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
     // Derived query traversing the associations: m.user.id AND m.household.id.
     // Used to stop a user being added to the same household twice.
     fun existsByUserIdAndHouseholdId(userId: Long, householdId: Long): Boolean
+
+    fun countByHouseholdId(householdId: Long): Long
+
+    fun deleteByUserIdAndHouseholdId(userId: Long, householdId: Long): Long
 }

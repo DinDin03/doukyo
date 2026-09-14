@@ -1,12 +1,25 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Body, Button, Heading } from '../../src/design/ui';
 import { colors, ink } from '../../src/design/theme';
+import { RestorableHousehold, useHousehold } from '../../src/household/HouseholdContext';
+import { errorMessage } from '../../src/apollo';
 
 export default function HouseholdChoice() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { fetchRestorable, restoreHousehold } = useHousehold();
+  const [restorable, setRestorable] = useState<RestorableHousehold[]>([]);
+
+  useEffect(() => {
+    fetchRestorable().then(setRestorable, () => setRestorable([]));
+  }, [fetchRestorable]);
+
+  const restore = (h: RestorableHousehold) =>
+    // The root gate moves you into the app once the household is back.
+    restoreHousehold(h.id).catch((e) => Alert.alert("Couldn't restore", errorMessage(e)));
   return (
     <View style={[styles.root, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 36 }]}>
       <View style={{ flex: 1 }}>
@@ -22,6 +35,9 @@ export default function HouseholdChoice() {
         </Body>
       </View>
       <View style={{ gap: 10 }}>
+        {restorable.map((h) => (
+          <Button key={h.id} label={`Restore ${h.name}`} variant="secondary" block onPress={() => restore(h)} />
+        ))}
         <Button label="Create a household" block onPress={() => router.push('/(household)/create')} />
         <Button label="Join with a code" variant="secondary" block onPress={() => router.push('/(household)/join')} />
         <Body size={11} color={ink(0.45)} style={styles.foot}>

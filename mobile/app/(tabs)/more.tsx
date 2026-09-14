@@ -1,19 +1,37 @@
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../src/auth/AuthContext';
 import { useHousehold } from '../../src/household/HouseholdContext';
+import { errorMessage } from '../../src/apollo';
 import { AppHeader } from '../../src/design/AppHeader';
 import { Body, Divider, Heading, Kicker, Num, Row, Screen } from '../../src/design/ui';
 import { Avatar } from '../../src/design/widgets';
 import { colors, ink, radius } from '../../src/design/theme';
 
-const LINKS = ['Notifications', 'Receipts & exports', 'Help & feedback', 'Sign out'];
+const LINKS = ['Notifications', 'Receipts & exports', 'Help & feedback', 'Leave household', 'Sign out'];
+const DESTRUCTIVE = ['Leave household', 'Sign out'];
 
 export default function MoreScreen() {
   const { user, signOut } = useAuth();
-  const { activeHousehold, households } = useHousehold();
+  const { activeHousehold, households, leaveHousehold } = useHousehold();
 
   if (!activeHousehold) return null; // the root gate guarantees this, but keeps TS happy
+
+  const confirmLeave = () => {
+    const last = activeHousehold.members.length === 1;
+    const leave = () =>
+      leaveHousehold(activeHousehold.id, last).catch((e) => Alert.alert("Couldn't leave", errorMessage(e)));
+    Alert.alert(
+      last ? `Delete ${activeHousehold.name}?` : `Leave ${activeHousehold.name}?`,
+      last
+        ? "You're the last member, so leaving deletes the household. You can restore it within 30 days."
+        : "You'll lose access to its chat and expenses. The invite code changes, so you'd need the new one to come back.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: last ? 'Delete' : 'Leave', style: 'destructive', onPress: leave },
+      ],
+    );
+  };
 
   const otherHousehold = households.find((h) => h.id !== activeHousehold.id);
   const memberCount = activeHousehold.members.length;
@@ -73,10 +91,10 @@ export default function MoreScreen() {
           {LINKS.map((l) => (
             <Row
               key={l}
-              onPress={() => (l === 'Sign out' ? signOut() : undefined)}
+              onPress={() => (l === 'Sign out' ? signOut() : l === 'Leave household' ? confirmLeave() : undefined)}
               style={styles.linkRow}
             >
-              <Body size={14} color={l === 'Sign out' ? colors.accentRamp[700] : colors.text}>
+              <Body size={14} color={DESTRUCTIVE.includes(l) ? colors.accentRamp[700] : colors.text}>
                 {l}
               </Body>
               <Feather name="chevron-right" size={15} color={ink(0.35)} />

@@ -18,14 +18,21 @@ class Household(
     @Column(nullable = false)
     var name: String,
 
-    // Generated once at creation (HouseholdService), never changes.
+    // Rotated whenever someone leaves, so leaving can't be undone by rejoining.
     @Column(name = "invite_code", nullable = false, unique = true)
-    val inviteCode: String,
+    var inviteCode: String,
 
     // OffsetDateTime maps to the `timestamptz` column. We set it in code; the DB's
     // DEFAULT now() is the backstop if it's ever omitted.
     @Column(name = "created_at", nullable = false)
     val createdAt: OffsetDateTime = OffsetDateTime.now(),
+
+    // Set when the last member leaves. deletedBy is the only person who can restore it.
+    @Column(name = "deleted_at")
+    var deletedAt: OffsetDateTime? = null,
+
+    @Column(name = "deleted_by")
+    var deletedBy: Long? = null,
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

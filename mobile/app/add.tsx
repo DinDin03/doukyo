@@ -7,16 +7,12 @@ import { Checkbox, Chip, Segmented, Stepper } from '../src/design/widgets';
 import { colors, ink, radius } from '../src/design/theme';
 import { useAuth } from '../src/auth/AuthContext';
 import { useHousehold } from '../src/household/HouseholdContext';
+import { errorMessage } from '../src/apollo';
 import { ExpenseCategory, formatCents, SplitMethod, useExpenses } from '../src/expense/useExpenses';
 
 const CATEGORIES: ExpenseCategory[] = ['GROCERIES', 'BILLS', 'DINING', 'HOUSEHOLD', 'OTHER'];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
 const title = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
-
-function errorMessage(e: unknown): string {
-  const err = e as { errors?: { message: string }[]; graphQLErrors?: { message: string }[]; message?: string };
-  return err?.errors?.[0]?.message ?? err?.graphQLErrors?.[0]?.message ?? err?.message ?? 'Could not save the expense';
-}
 
 export default function AddExpenseScreen() {
   const router = useRouter();

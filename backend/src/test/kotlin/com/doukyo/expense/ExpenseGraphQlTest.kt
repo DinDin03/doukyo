@@ -178,7 +178,7 @@ class ExpenseGraphQlTest : AbstractIntegrationTest() {
             "{ balances(householdId: ${household.id}) { netCents } }",
         ).forEach { document ->
             graphQlTester.document(document).execute().errors().satisfy { errors ->
-                assertThat(errors[0].errorType).isEqualTo(ErrorType.UNAUTHORIZED)
+                assertThat(errors[0].errorType).isEqualTo(ErrorType.FORBIDDEN)
             }
         }
     }

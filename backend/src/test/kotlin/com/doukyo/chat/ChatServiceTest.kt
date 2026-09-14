@@ -1,7 +1,7 @@
 package com.doukyo.chat
 
 import com.doukyo.AbstractIntegrationTest
-import com.doukyo.common.UnauthorizedException
+import com.doukyo.common.ForbiddenException
 import com.doukyo.household.Household
 import com.doukyo.household.HouseholdService
 import com.doukyo.user.User
@@ -103,7 +103,7 @@ class ChatServiceTest : AbstractIntegrationTest() {
     @Test
     fun `a non-member cannot send`() {
         assertThatThrownBy { chatService.send(hid, outsider.id!!, "let me in", "x") }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
             .hasMessage("You're not a member of this household")
         assertThat(messageRepository.findAll()).isEmpty()
     }
@@ -164,7 +164,7 @@ class ChatServiceTest : AbstractIntegrationTest() {
     fun `a non-member cannot read history`() {
         send(alice, "private")
         assertThatThrownBy { chatService.history(hid, outsider.id!!, null, null) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 
     // --- messagesSince (reconnect backfill) ---
@@ -192,7 +192,7 @@ class ChatServiceTest : AbstractIntegrationTest() {
     @Test
     fun `a non-member cannot backfill`() {
         assertThatThrownBy { chatService.since(hid, outsider.id!!, 0) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 
     // --- unread + markRead ---
@@ -246,9 +246,9 @@ class ChatServiceTest : AbstractIntegrationTest() {
     @Test
     fun `a non-member has no unread count and cannot mark read`() {
         assertThatThrownBy { chatService.unreadCount(hid, outsider.id!!) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
         assertThatThrownBy { chatService.markRead(hid, outsider.id!!, 1) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 
     // --- membership checks ---
@@ -264,6 +264,6 @@ class ChatServiceTest : AbstractIntegrationTest() {
     fun `requireMember throws for a non-member only`() {
         chatService.requireMember(hid, alice.id!!)
         assertThatThrownBy { chatService.requireMember(hid, outsider.id!!) }
-            .isInstanceOf(UnauthorizedException::class.java)
+            .isInstanceOf(ForbiddenException::class.java)
     }
 }
