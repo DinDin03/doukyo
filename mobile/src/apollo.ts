@@ -21,6 +21,12 @@ export function setUnauthenticatedHandler(fn: () => void) {
   onUnauthenticated = fn;
 }
 
+// GraphQL errors arrive wrapped (Apollo v4: `errors`); network errors carry `message`.
+export function errorMessage(e: unknown, fallback = 'Something went wrong'): string {
+  const err = e as { errors?: { message: string }[]; graphQLErrors?: { message: string }[]; message?: string };
+  return err?.errors?.[0]?.message ?? err?.graphQLErrors?.[0]?.message ?? err?.message ?? fallback;
+}
+
 const AUTH_OPS = ['SignIn', 'StartSignUp', 'ConfirmSignUp', 'Refresh', 'GoogleSignIn', 'SignOut'];
 
 // Exchange the refresh token for a fresh access token, via a RAW fetch (not Apollo,

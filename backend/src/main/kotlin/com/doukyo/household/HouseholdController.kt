@@ -25,6 +25,19 @@ class HouseholdController(private val householdService: HouseholdService) {
     fun joinHousehold(@Argument code: String): Household =
         householdService.joinHousehold(code, CurrentUser.id())
 
+    @MutationMapping
+    fun leaveHousehold(@Argument householdId: Long, @Argument confirmDelete: Boolean): Boolean {
+        householdService.leaveHousehold(householdId, CurrentUser.id(), confirmDelete)
+        return true
+    }
+
+    @QueryMapping
+    fun restorableHouseholds(): List<Household> = householdService.findRestorableHouseholds(CurrentUser.id())
+
+    @MutationMapping
+    fun restoreHousehold(@Argument householdId: Long): Household =
+        householdService.restoreHousehold(householdId, CurrentUser.id())
+
     @SchemaMapping(typeName = "Household", field = "members")
     fun members(household: Household): List<User> =
         householdService.findMembers(household.id!!)

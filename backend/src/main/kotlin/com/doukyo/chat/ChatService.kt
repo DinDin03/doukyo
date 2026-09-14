@@ -1,5 +1,6 @@
 package com.doukyo.chat
 
+import com.doukyo.common.ForbiddenException
 import com.doukyo.common.UnauthorizedException
 import com.doukyo.household.HouseholdRepository
 import com.doukyo.household.MembershipRepository
@@ -118,7 +119,7 @@ class ChatService(
 
     fun requireMember(householdId: Long, userId: Long) {
         if (!isMember(householdId, userId)) {
-            throw UnauthorizedException("You're not a member of this household")
+            throw ForbiddenException("You're not a member of this household")
         }
     }
 }

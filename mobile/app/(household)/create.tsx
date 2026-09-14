@@ -6,11 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Body, Button, Divider, Field, Heading } from '../../src/design/ui';
 import { colors, ink } from '../../src/design/theme';
 import { useHousehold } from '../../src/household/HouseholdContext';
-
-function errorMessage(e: unknown): string {
-  const err = e as { errors?: { message: string }[]; graphQLErrors?: { message: string }[]; message?: string };
-  return err?.errors?.[0]?.message ?? err?.graphQLErrors?.[0]?.message ?? err?.message ?? 'Something went wrong';
-}
+import { errorMessage } from '../../src/apollo';
 
 export default function CreateHousehold() {
   const router = useRouter();

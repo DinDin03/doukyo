@@ -1,6 +1,6 @@
 package com.doukyo.expense
 
-import com.doukyo.common.UnauthorizedException
+import com.doukyo.common.ForbiddenException
 import com.doukyo.household.HouseholdRepository
 import com.doukyo.household.MembershipRepository
 import com.doukyo.user.UserRepository
@@ -150,7 +150,7 @@ class ExpenseService(
 
     private fun requireMember(householdId: Long, userId: Long) {
         if (!membershipRepository.existsByUserIdAndHouseholdId(userId, householdId)) {
-            throw UnauthorizedException("You're not a member of this household")
+            throw ForbiddenException("You're not a member of this household")
         }
     }
 
