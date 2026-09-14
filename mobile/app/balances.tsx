@@ -20,11 +20,14 @@ export default function BalancesScreen() {
   const mine = balances.find((b) => b.userId === user?.id);
   const net = mine?.netCents ?? 0;
 
-  // Everything you personally still owe, one row per expense — settling is
-  // per-share, so this is the list of things that can actually be settled.
+  // Only the payer can settle (the server enforces it), so the button lives on
+  // money owed TO you. What you owe is shown, but it's theirs to confirm.
+  const owedToYou = expenses
+    .filter((e) => e.paidBy.id === user?.id)
+    .flatMap((e) => e.shares.filter((s) => !s.isPaid && s.user.id !== user?.id).map((share) => ({ expense: e, share })));
   const youOwe = expenses
-    .map((e) => ({ expense: e, share: e.shares.find((s) => s.user.id === user?.id && !s.isPaid) }))
-    .filter((row) => row.share && row.expense.paidBy.id !== user?.id);
+    .filter((e) => e.paidBy.id !== user?.id)
+    .flatMap((e) => e.shares.filter((s) => !s.isPaid && s.user.id === user?.id).map((share) => ({ expense: e, share })));
 
   const onSettle = async (shareId: string) => {
     setSettling(shareId);
@@ -81,35 +84,50 @@ export default function BalancesScreen() {
               </View>
             ))}
 
+            {owedToYou.length > 0 ? (
+              <>
+                <Kicker color={ink(0.45)} style={styles.section}>
+                  Owed to you
+                </Kicker>
+                {owedToYou.map(({ expense, share }) => (
+                  <View key={share.id} style={styles.row}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Heading size={16}>{share.user.name}</Heading>
+                      <Body size={11.5} color={ink(0.52)} style={{ marginTop: 2 }}>
+                        {expense.description}
+                      </Body>
+                    </View>
+                    <Num size={16} style={{ marginRight: 12 }}>
+                      {formatCents(share.amountCents)}
+                    </Num>
+                    <Pressable onPress={() => onSettle(share.id)} disabled={settling === share.id} style={styles.settle}>
+                      {settling === share.id ? (
+                        <ActivityIndicator size="small" color={colors.accent} />
+                      ) : (
+                        <Body size={12} color={colors.accent}>
+                          Paid
+                        </Body>
+                      )}
+                    </Pressable>
+                  </View>
+                ))}
+              </>
+            ) : null}
+
             {youOwe.length > 0 ? (
               <>
                 <Kicker color={ink(0.45)} style={styles.section}>
                   What you owe
                 </Kicker>
                 {youOwe.map(({ expense, share }) => (
-                  <View key={share!.id} style={styles.row}>
+                  <View key={share.id} style={styles.row}>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Heading size={16}>{expense.description}</Heading>
                       <Body size={11.5} color={ink(0.52)} style={{ marginTop: 2 }}>
-                        {expense.paidBy.name} paid
+                        Pay {expense.paidBy.name} — they&apos;ll mark it settled
                       </Body>
                     </View>
-                    <Num size={16} style={{ marginRight: 12 }}>
-                      {formatCents(share!.amountCents)}
-                    </Num>
-                    <Pressable
-                      onPress={() => onSettle(share!.id)}
-                      disabled={settling === share!.id}
-                      style={styles.settle}
-                    >
-                      {settling === share!.id ? (
-                        <ActivityIndicator size="small" color={colors.accent} />
-                      ) : (
-                        <Body size={12} color={colors.accent}>
-                          Settle
-                        </Body>
-                      )}
-                    </Pressable>
+                    <Num size={16}>{formatCents(share.amountCents)}</Num>
                   </View>
                 ))}
               </>
